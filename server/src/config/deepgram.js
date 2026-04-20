@@ -21,8 +21,8 @@ export const getDeepgramClient = () => {
 // Default config for live transcription
 export const DEEPGRAM_LIVE_CONFIG = {
   model: 'nova-2',
-  language: 'hi',           // Default to Hindi
-  // detect_language: true, // EXPLICITLY REMOVED: Deepgram errors if language AND detect_language are both provided
+  // language: 'hi',           // Removed fixed language
+  detect_language: true,     // Let Deepgram detect the user's language automatically
   smart_format: true,        // Punctuation + formatting
   diarize: true,             // Speaker identification (doctor vs patient)
   punctuate: true,

@@ -8,7 +8,6 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '../.env' });
 
 import connectDB from './src/config/db.js';
-import { setupAudioHandler } from './src/socket/audioHandler.js';
 import { errorHandler, notFoundHandler } from './src/middleware/errorHandler.js';
 import { authenticate } from './src/middleware/auth.js';
 
@@ -72,9 +71,6 @@ app.get('/api/health', (req, res) => {
 // ─── ERROR HANDLING ─────────────────────────────────────
 app.use(notFoundHandler);
 app.use(errorHandler);
-
-// ─── SETUP WEBSOCKET ────────────────────────────────────
-setupAudioHandler(io);
 
 // ─── START SERVER ───────────────────────────────────────
 const PORT = process.env.PORT || 5000;

@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { getSocket } from '../services/socket';
 
 export default function ConsultationPage() {
   const [searchParams] = useSearchParams();
@@ -9,9 +8,8 @@ export default function ConsultationPage() {
 
   const [isRecording, setIsRecording] = useState(false);
   const [sessionId, setSessionId] = useState('');
-  const [interimText, setInterimText] = useState('');
   const [finalTranscript, setFinalTranscript] = useState('');
-  const [progress, setProgress] = useState(null);
+  const [statusMessage, setStatusMessage] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
@@ -19,60 +17,61 @@ export default function ConsultationPage() {
   const [manualBusy, setManualBusy] = useState(false);
   const [audioFile, setAudioFile] = useState(null);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [recordingBusy, setRecordingBusy] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
+  const recordingChunksRef = useRef([]);
   const fileInputRef = useRef(null);
 
-  const socket = useMemo(() => getSocket(), []);
+  const processAudioFile = async (file) => {
+    if (!patientId.trim()) {
+      setError('Patient ID is required');
+      return;
+    }
 
-  useEffect(() => {
-    const onReady = (payload) => {
-      setSessionId(payload.sessionId);
-      setError('');
-    };
+    if (!file) {
+      setError('Please select or record an audio file');
+      return;
+    }
 
-    const onInterim = (payload) => {
-      setInterimText(payload.text || '');
-    };
+    setUploadBusy(true);
+    setError('');
+    setResult(null);
+    setStatusMessage('Uploading audio and processing consultation...');
 
-    const onFinal = (payload) => {
-      setInterimText('');
-      setFinalTranscript(payload.fullTranscript || '');
-    };
+    try {
+      const formData = new FormData();
+      formData.append('patientId', patientId.trim());
+      formData.append('audio', file);
 
-    const onProgress = (payload) => setProgress(payload);
+      const { data } = await api.post('/consultations', formData, {
+        timeout: 180000,
+      });
 
-    const onComplete = (payload) => {
-      setResult(payload);
-      setIsRecording(false);
-      setProgress(null);
-      if (!payload.success) {
-        setError(payload.message || 'Extraction failed');
-      }
-    };
-
-    const onSocketError = (payload) => {
-      setError(payload.message || 'Socket error');
-      setIsRecording(false);
-    };
-
-    socket.on('audio:ready', onReady);
-    socket.on('transcript:interim', onInterim);
-    socket.on('transcript:final', onFinal);
-    socket.on('extraction:progress', onProgress);
-    socket.on('extraction:complete', onComplete);
-    socket.on('error', onSocketError);
-
-    return () => {
-      socket.off('audio:ready', onReady);
-      socket.off('transcript:interim', onInterim);
-      socket.off('transcript:final', onFinal);
-      socket.off('extraction:progress', onProgress);
-      socket.off('extraction:complete', onComplete);
-      socket.off('error', onSocketError);
-    };
-  }, [socket]);
+      setResult({
+        success: true,
+        sessionId: data.consultation.sessionId,
+        structuredData: data.consultation.structuredData,
+        aiSuggestions: data.consultation.aiSuggestions,
+        transcript: data.consultation.transcript,
+      });
+      setSessionId(data.consultation.sessionId);
+      setFinalTranscript(data.consultation.transcript || '');
+      setStatusMessage('Consultation processed successfully.');
+    } catch (uploadError) {
+      const serverError = uploadError?.response?.data?.error;
+      const statusCode = uploadError?.response?.status;
+      setError(
+        serverError
+          ? `Upload failed (${statusCode}): ${serverError}`
+          : (uploadError.message || 'Failed to process audio upload')
+      );
+      setStatusMessage('');
+    } finally {
+      setUploadBusy(false);
+    }
+  };
 
   const startRecording = async () => {
     if (!patientId.trim()) {
@@ -83,7 +82,8 @@ export default function ConsultationPage() {
     setError('');
     setResult(null);
     setFinalTranscript('');
-    setInterimText('');
+    setStatusMessage('Recording in progress...');
+    recordingChunksRef.current = [];
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -95,18 +95,38 @@ export default function ConsultationPage() {
 
       mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data && event.data.size > 0 && socket.connected) {
-          const arrayBuffer = await event.data.arrayBuffer();
-          socket.emit('audio:chunk', arrayBuffer);
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
         }
       };
 
-      socket.emit('audio:start', { patientId });
-      mediaRecorder.start(250);
+      mediaRecorder.onstop = async () => {
+        mediaStreamRef.current?.getTracks()?.forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        mediaStreamRef.current = null;
+
+        if (!recordingChunksRef.current.length) {
+          setStatusMessage('No audio recorded. Please try again.');
+          return;
+        }
+
+        const blob = new Blob(recordingChunksRef.current, { type: 'audio/webm' });
+        const recordedFile = new File([blob], `recording-${Date.now()}.webm`, { type: 'audio/webm' });
+        setAudioFile(recordedFile);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        setRecordingBusy(true);
+        setStatusMessage('Recording complete. Processing audio...');
+        await processAudioFile(recordedFile);
+        setRecordingBusy(false);
+      };
+
+      mediaRecorder.start(1000);
       setIsRecording(true);
     } catch (startError) {
       setError(startError.message || 'Could not access microphone');
+      setStatusMessage('');
     }
   };
 
@@ -114,11 +134,6 @@ export default function ConsultationPage() {
     if (!isRecording) return;
 
     mediaRecorderRef.current?.stop();
-    mediaStreamRef.current?.getTracks()?.forEach((track) => track.stop());
-    mediaRecorderRef.current = null;
-    mediaStreamRef.current = null;
-
-    socket.emit('audio:stop');
     setIsRecording(false);
   };
 
@@ -144,69 +159,27 @@ export default function ConsultationPage() {
         transcript: data.consultation.transcript,
       });
       setSessionId(data.consultation.sessionId);
+      setFinalTranscript(data.consultation.transcript || '');
+      setStatusMessage('Consultation processed successfully.');
     } catch (manualError) {
       setError(manualError?.response?.data?.error || manualError.message || 'Failed to process transcript');
+      setStatusMessage('');
     } finally {
       setManualBusy(false);
     }
   };
 
   const uploadVoiceFile = async () => {
-    if (!patientId.trim()) {
-      setError('Patient ID is required');
-      return;
-    }
-
-    if (!audioFile) {
-      setError('Please select an audio file');
-      return;
-    }
-
-    setUploadBusy(true);
-    setError('');
-    setResult(null);
-    setProgress({ stage: 'Uploading and processing audio...', percent: 10 });
-
-    try {
-      const formData = new FormData();
-      formData.append('patientId', patientId.trim());
-      formData.append('audio', audioFile);
-
-      const { data } = await api.post('/consultations', formData, {
-        timeout: 180000,
-      });
-
-      setResult({
-        success: true,
-        sessionId: data.consultation.sessionId,
-        structuredData: data.consultation.structuredData,
-        aiSuggestions: data.consultation.aiSuggestions,
-        transcript: data.consultation.transcript,
-      });
-      setSessionId(data.consultation.sessionId);
-      setFinalTranscript(data.consultation.transcript || '');
-      setProgress(null);
-      setAudioFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (uploadError) {
-      setProgress(null);
-      const serverError = uploadError?.response?.data?.error;
-      const statusCode = uploadError?.response?.status;
-      setError(
-        serverError
-          ? `Upload failed (${statusCode}): ${serverError}`
-          : (uploadError.message || 'Failed to process audio upload')
-      );
-    } finally {
-      setUploadBusy(false);
-    }
+    await processAudioFile(audioFile);
+    setAudioFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-5">
-        <h1 className="text-2xl font-bold">Live Consultation</h1>
-        <p className="text-sm text-slate-300">Start recording to stream audio chunks to backend and receive live transcription.</p>
+        <h1 className="text-2xl font-bold">Voice Consultation</h1>
+        <p className="text-sm text-slate-300">Record voice locally, then send the recording to consultation API for processing.</p>
 
         <div className="mt-4 flex flex-wrap gap-3">
           <input
@@ -216,8 +189,13 @@ export default function ConsultationPage() {
             className="min-w-[280px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
           />
           {!isRecording ? (
-            <button type="button" onClick={startRecording} className="rounded-lg bg-rose-300 px-4 py-2 font-semibold text-slate-900">
-              Start Recording
+            <button
+              type="button"
+              onClick={startRecording}
+              disabled={recordingBusy || uploadBusy}
+              className="rounded-lg bg-rose-300 px-4 py-2 font-semibold text-slate-900 disabled:opacity-60"
+            >
+              {recordingBusy ? 'Processing...' : 'Record & Process'}
             </button>
           ) : (
             <button type="button" onClick={stopRecording} className="rounded-lg bg-amber-300 px-4 py-2 font-semibold text-slate-900">
@@ -226,26 +204,15 @@ export default function ConsultationPage() {
           )}
         </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
-            <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">Interim Transcript</p>
-            <p className="text-sm text-slate-200">{interimText || 'Waiting for speech...'}</p>
-          </div>
-          <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
-            <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">Final Transcript</p>
-            <p className="text-sm text-slate-200">{finalTranscript || 'Final transcript will accumulate here.'}</p>
-          </div>
-        </div>
-
-        {progress && (
-          <div className="mt-4 rounded-xl border border-cyan-500/50 bg-cyan-500/10 p-3 text-sm text-cyan-100">
-            {progress.stage} ({progress.percent}%)
-          </div>
-        )}
+        {statusMessage && <p className="mt-4 rounded-xl border border-cyan-500/50 bg-cyan-500/10 p-3 text-sm text-cyan-100">{statusMessage}</p>}
 
         {error && <p className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
 
         <div className="mt-4 text-xs text-slate-400">Session: {sessionId || 'not started'}</div>
+        <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">Transcript</p>
+          <p className="text-sm text-slate-200">{finalTranscript || 'Processed transcript will appear here.'}</p>
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-5">
