@@ -216,7 +216,6 @@ function buildPatientReportText(report) {
   const lines = [];
 
   lines.push('VoiceCare Patient Report');
-  lines.push('================================');
   lines.push(`Generated at: ${new Date(report.generatedAt).toLocaleString()}`);
   lines.push(`Patient: ${report.patient.name} (${report.patient.patientId})`);
   lines.push(`Age/Gender: ${report.patient.age || 'N/A'} / ${report.patient.gender || 'N/A'}`);

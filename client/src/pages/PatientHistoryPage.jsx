@@ -14,6 +14,17 @@ export default function PatientHistoryPage() {
   const [playingAudio, setPlayingAudio] = useState('');
   const utteranceRef = useRef(null);
 
+  const stopCurrentAudio = () => {
+    if (utteranceRef.current) {
+      // Remove handlers so manual stop does not trigger an error alert.
+      utteranceRef.current.onend = null;
+      utteranceRef.current.onerror = null;
+      utteranceRef.current = null;
+    }
+    window.speechSynthesis.cancel();
+    setPlayingAudio('');
+  };
+
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -34,7 +45,7 @@ export default function PatientHistoryPage() {
   useEffect(() => {
     return () => {
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+        stopCurrentAudio();
       }
     };
   }, []);
@@ -105,11 +116,10 @@ export default function PatientHistoryPage() {
     }
 
     if (playingAudio === sessionId) {
-      window.speechSynthesis.cancel();
-      setPlayingAudio('');
+      stopCurrentAudio();
     } else {
       try {
-        window.speechSynthesis.cancel();
+        stopCurrentAudio();
 
         setPlayingAudio(`${sessionId}-loading`);
 
@@ -127,9 +137,19 @@ export default function PatientHistoryPage() {
         utterance.lang = 'en-US';
 
         utterance.onend = () => {
+          utteranceRef.current = null;
           setPlayingAudio('');
         };
-        utterance.onerror = () => {
+        utterance.onerror = (event) => {
+          utteranceRef.current = null;
+
+          // Browsers may emit canceled/interrupted when we intentionally call cancel().
+          const errorType = event?.error || '';
+          if (errorType === 'canceled' || errorType === 'interrupted') {
+            setPlayingAudio('');
+            return;
+          }
+
           alert('Failed to read this encounter aloud.');
           setPlayingAudio('');
         };
