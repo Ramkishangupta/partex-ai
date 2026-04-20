@@ -1,6 +1,12 @@
 import mongoose from 'mongoose';
 
 const patientSchema = new mongoose.Schema({
+  doctorId: {
+    type: String,
+    required: true,
+    default: 'DOC-DEFAULT',
+    index: true,
+  },
   patientId: {
     type: String,
     unique: true,
@@ -47,6 +53,7 @@ const patientSchema = new mongoose.Schema({
 });
 
 // Text index for search
+patientSchema.index({ doctorId: 1, updatedAt: -1 });
 patientSchema.index({ name: 'text', phone: 'text', patientId: 'text' });
 
 const Patient = mongoose.model('Patient', patientSchema);

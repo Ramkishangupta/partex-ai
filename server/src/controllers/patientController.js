@@ -3,9 +3,12 @@ import Prescription from '../models/Prescription.js';
 import { generatePatientId } from '../utils/idGenerator.js';
 import { getPatientSummary } from '../services/ragService.js';
 
+const getDoctorScope = (req) => ({ doctorId: req.doctorId || 'DOC-DEFAULT' });
+
 // POST /api/patients - Create a new patient
 export const createPatient = async (req, res, next) => {
   try {
+    const scope = getDoctorScope(req);
     const { name, age, gender, phone, address, bloodGroup, allergies, medicalHistory } = req.body;
 
     if (!name) {
@@ -13,6 +16,7 @@ export const createPatient = async (req, res, next) => {
     }
 
     const patient = new Patient({
+      doctorId: scope.doctorId,
       patientId: generatePatientId(),
       name,
       age,
@@ -34,12 +38,14 @@ export const createPatient = async (req, res, next) => {
 // GET /api/patients - List all patients (with optional search)
 export const getPatients = async (req, res, next) => {
   try {
+    const scope = getDoctorScope(req);
     const { q, page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
-    let query = {};
+    let query = { ...scope };
     if (q) {
       query = {
+        ...scope,
         $or: [
           { name: { $regex: q, $options: 'i' } },
           { patientId: { $regex: q, $options: 'i' } },
@@ -66,7 +72,8 @@ export const getPatients = async (req, res, next) => {
 // GET /api/patients/:id - Get a single patient by patientId
 export const getPatientById = async (req, res, next) => {
   try {
-    const patient = await Patient.findOne({ patientId: req.params.id }).lean();
+    const scope = getDoctorScope(req);
+    const patient = await Patient.findOne({ patientId: req.params.id, ...scope }).lean();
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
@@ -79,11 +86,13 @@ export const getPatientById = async (req, res, next) => {
 // PUT /api/patients/:id - Update patient
 export const updatePatient = async (req, res, next) => {
   try {
+    const scope = getDoctorScope(req);
     const updates = req.body;
     delete updates.patientId; // Don't allow ID changes
+    delete updates.doctorId;
 
     const patient = await Patient.findOneAndUpdate(
-      { patientId: req.params.id },
+      { patientId: req.params.id, ...scope },
       updates,
       { new: true, runValidators: true }
     );
@@ -101,14 +110,15 @@ export const updatePatient = async (req, res, next) => {
 // GET /api/patients/:id/history - Get full visit history
 export const getPatientHistory = async (req, res, next) => {
   try {
+    const scope = getDoctorScope(req);
     const { default: Consultation } = await import('../models/Consultation.js');
 
-    const patient = await Patient.findOne({ patientId: req.params.id }).lean();
+    const patient = await Patient.findOne({ patientId: req.params.id, ...scope }).lean();
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    const consultations = await Consultation.find({ patientId: req.params.id })
+    const consultations = await Consultation.find({ patientId: req.params.id, ...scope })
       .sort({ consultationDate: -1 })
       .lean();
 
@@ -126,18 +136,19 @@ export const getPatientHistory = async (req, res, next) => {
 // GET /api/patients/:id/report - Get a doctor-friendly report summary for a patient
 export const getPatientReport = async (req, res, next) => {
   try {
+    const scope = getDoctorScope(req);
     const { default: Consultation } = await import('../models/Consultation.js');
 
-    const patient = await Patient.findOne({ patientId: req.params.id }).lean();
+    const patient = await Patient.findOne({ patientId: req.params.id, ...scope }).lean();
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
     const [consultations, prescriptions, summary] = await Promise.all([
-      Consultation.find({ patientId: req.params.id })
+      Consultation.find({ patientId: req.params.id, ...scope })
         .sort({ consultationDate: -1 })
         .lean(),
-      Prescription.find({ patientId: req.params.id })
+      Prescription.find({ patientId: req.params.id, ...scope })
         .sort({ createdAt: -1 })
         .lean(),
       getPatientSummary(req.params.id),

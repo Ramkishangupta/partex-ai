@@ -8,8 +8,8 @@ import Prescription from '../models/Prescription.js';
 /**
  * Generate a prescription from consultation structured data
  */
-export const generatePrescription = async (consultationId) => {
-  const consultation = await Consultation.findOne({ sessionId: consultationId });
+export const generatePrescription = async (consultationId, doctorId) => {
+  const consultation = await Consultation.findOne({ sessionId: consultationId, doctorId });
   if (!consultation) {
     throw new Error('Consultation not found');
   }
@@ -45,8 +45,8 @@ export const generatePrescription = async (consultationId) => {
 /**
  * Get prescriptions for a patient
  */
-export const getPatientPrescriptions = async (patientId) => {
-  return Prescription.find({ patientId })
+export const getPatientPrescriptions = async (patientId, doctorId) => {
+  return Prescription.find({ patientId, doctorId })
     .sort({ createdAt: -1 })
     .lean();
 };

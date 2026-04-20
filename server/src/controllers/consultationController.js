@@ -6,17 +6,20 @@ import { extractMedicalData, generateDoctorAssist } from '../services/llmService
 import { transcribeAudioFile } from '../services/asrService.js';
 import { getPatientSummary } from '../services/ragService.js';
 
+const getDoctorId = (req) => req.doctorId || 'DOC-DEFAULT';
+
 // POST /api/consultations - Start a new consultation (or process uploaded audio)
 export const createConsultation = async (req, res, next) => {
   try {
-    const { patientId, doctorId = 'DOC-DEFAULT', transcript } = req.body;
+    const { patientId, transcript } = req.body;
+    const doctorId = getDoctorId(req);
 
     if (!patientId) {
       return res.status(400).json({ error: 'Patient ID is required' });
     }
 
     const sessionId = generateSessionId();
-    const visitCount = await Consultation.countDocuments({ patientId });
+    const visitCount = await Consultation.countDocuments({ patientId, doctorId });
 
     // Case 1: Audio file uploaded — full pipeline
     if (req.file) {
@@ -145,7 +148,8 @@ export const createConsultation = async (req, res, next) => {
 // GET /api/consultations/:sessionId - Get a consultation
 export const getConsultationById = async (req, res, next) => {
   try {
-    const consultation = await Consultation.findOne({ sessionId: req.params.sessionId }).lean();
+    const doctorId = getDoctorId(req);
+    const consultation = await Consultation.findOne({ sessionId: req.params.sessionId, doctorId }).lean();
     if (!consultation) {
       return res.status(404).json({ error: 'Consultation not found' });
     }
@@ -158,14 +162,15 @@ export const getConsultationById = async (req, res, next) => {
 // GET /api/consultations/:sessionId/report - Get a readable report for a specific encounter
 export const getConsultationReport = async (req, res, next) => {
   try {
-    const consultation = await Consultation.findOne({ sessionId: req.params.sessionId }).lean();
+    const doctorId = getDoctorId(req);
+    const consultation = await Consultation.findOne({ sessionId: req.params.sessionId, doctorId }).lean();
     if (!consultation) {
       return res.status(404).json({ error: 'Consultation not found' });
     }
 
     const [patient, prescription, summary] = await Promise.all([
-      Patient.findOne({ patientId: consultation.patientId }).lean(),
-      Prescription.findOne({ consultationId: consultation.sessionId }).lean(),
+      Patient.findOne({ patientId: consultation.patientId, doctorId }).lean(),
+      Prescription.findOne({ consultationId: consultation.sessionId, doctorId }).lean(),
       getPatientSummary(consultation.patientId),
     ]);
 
@@ -226,10 +231,11 @@ export const getConsultationReport = async (req, res, next) => {
 // GET /api/consultations - List recent consultations
 export const getConsultations = async (req, res, next) => {
   try {
+    const doctorId = getDoctorId(req);
     const { patientId, status, page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
-    const query = {};
+    const query = { doctorId };
     if (patientId) query.patientId = patientId;
     if (status) query.status = status;
 
@@ -316,12 +322,14 @@ function buildConsultationReportText(report) {
 // PATCH /api/consultations/:sessionId - Update consultation (e.g., doctor edits)
 export const updateConsultation = async (req, res, next) => {
   try {
+    const doctorId = getDoctorId(req);
     const updates = req.body;
     delete updates.sessionId;
     delete updates.patientId;
+    delete updates.doctorId;
 
     const consultation = await Consultation.findOneAndUpdate(
-      { sessionId: req.params.sessionId },
+      { sessionId: req.params.sessionId, doctorId },
       { $set: updates },
       { new: true }
     );
