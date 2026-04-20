@@ -69,12 +69,12 @@ export default function PatientHistoryPage() {
   const downloadReport = async () => {
     setDownloadingReport(true);
     try {
-      const { data } = await api.get(`/patients/${patientId}/report`, { responseType: 'text' });
-      const textBlob = new Blob([data], { type: 'text/plain;charset=utf-8' });
-      const textUrl = URL.createObjectURL(textBlob);
+      const { data } = await api.get(`/patients/${patientId}/report`, { responseType: 'blob' });
+      const pdfBlob = new Blob([data], { type: 'application/pdf' });
+      const textUrl = URL.createObjectURL(pdfBlob);
       const textLink = document.createElement('a');
       textLink.href = textUrl;
-      textLink.download = `${patientId}-report.txt`;
+      textLink.download = `${patientId}-report.pdf`;
       textLink.click();
       URL.revokeObjectURL(textUrl);
     } finally {
@@ -85,12 +85,12 @@ export default function PatientHistoryPage() {
   const downloadEncounterReport = async (sessionId) => {
     setDownloadingEncounter(sessionId);
     try {
-      const { data } = await api.get(`/consultations/${sessionId}/report`, { responseType: 'text' });
-      const textBlob = new Blob([data], { type: 'text/plain;charset=utf-8' });
-      const textUrl = URL.createObjectURL(textBlob);
+      const { data } = await api.get(`/consultations/${sessionId}/report`, { responseType: 'blob' });
+      const pdfBlob = new Blob([data], { type: 'application/pdf' });
+      const textUrl = URL.createObjectURL(pdfBlob);
       const textLink = document.createElement('a');
       textLink.href = textUrl;
-      textLink.download = `${sessionId}-encounter-report.txt`;
+      textLink.download = `${sessionId}-encounter-report.pdf`;
       textLink.click();
       URL.revokeObjectURL(textUrl);
     } finally {
@@ -114,11 +114,8 @@ export default function PatientHistoryPage() {
         setPlayingAudio(`${sessionId}-loading`);
 
         // Fetch encounter report text and read it aloud.
-        const response = await api.get(`/consultations/${sessionId}/report`, {
-          responseType: 'text',
-        });
-
-        const text = (response.data || '').toString().trim();
+        const response = await api.get(`/consultations/${sessionId}/report?format=json`);
+        const text = (response?.data?.report?.text || '').toString().trim();
         if (!text) {
           throw new Error('No report text available to read aloud');
         }
@@ -243,7 +240,7 @@ export default function PatientHistoryPage() {
                     <button
                       type="button"
                       onClick={() => toggleAudioPlayback(consult.sessionId)}
-                      disabled={playingAudio === consult.sessionId || playingAudio === `${consult.sessionId}-loading`}
+                      disabled={playingAudio === `${consult.sessionId}-loading`}
                       className={`clean-button flex items-center gap-2 px-4 py-2 ${
                         playingAudio === consult.sessionId
                           ? 'bg-blue-100 border border-blue-300 text-blue-700'

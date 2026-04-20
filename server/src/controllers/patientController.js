@@ -2,6 +2,7 @@ import Patient from '../models/Patient.js';
 import Prescription from '../models/Prescription.js';
 import { generatePatientId } from '../utils/idGenerator.js';
 import { getPatientSummary } from '../services/ragService.js';
+import { generateReportPdfBuffer } from '../services/reportPdfService.js';
 
 const getDoctorScope = (req) => ({ doctorId: req.doctorId || 'DOC-DEFAULT' });
 
@@ -197,9 +198,15 @@ export const getPatientReport = async (req, res, next) => {
       });
     }
 
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${req.params.id}-report.txt"`);
-    return res.send(reportText);
+    const pdfBuffer = await generateReportPdfBuffer({
+      title: 'VoiceCare Patient Report',
+      subtitle: `${report.patient.name} (${report.patient.patientId})`,
+      content: reportText,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.id}-report.pdf"`);
+    return res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }

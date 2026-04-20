@@ -5,6 +5,7 @@ import { generateSessionId } from '../utils/idGenerator.js';
 import { extractMedicalData, generateDoctorAssist } from '../services/llmService.js';
 import { transcribeAudioFile } from '../services/asrService.js';
 import { getPatientSummary } from '../services/ragService.js';
+import { generateReportPdfBuffer } from '../services/reportPdfService.js';
 
 const getDoctorId = (req) => req.doctorId || 'DOC-DEFAULT';
 
@@ -220,9 +221,15 @@ export const getConsultationReport = async (req, res, next) => {
       });
     }
 
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${consultation.sessionId}-encounter-report.txt"`);
-    return res.send(reportText);
+    const pdfBuffer = await generateReportPdfBuffer({
+      title: 'VoiceCare Encounter Report',
+      subtitle: `${patient?.name || 'Unknown Patient'} (${consultation.sessionId})`,
+      content: reportText,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${consultation.sessionId}-encounter-report.pdf"`);
+    return res.send(pdfBuffer);
   } catch (error) {
     next(error);
   }

@@ -187,12 +187,12 @@ export default function ConsultationPage() {
     setError('');
 
     try {
-      const { data } = await api.get(`/patients/${patientId}/report`, { responseType: 'text' });
-      const blob = new Blob([data], { type: 'text/plain;charset=utf-8' });
+      const { data } = await api.get(`/patients/${patientId}/report`, { responseType: 'blob' });
+      const blob = new Blob([data], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${patientId}-report.txt`;
+      link.download = `${patientId}-report.pdf`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
