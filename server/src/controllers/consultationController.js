@@ -258,7 +258,6 @@ function buildConsultationReportText(report) {
   const lines = [];
 
   lines.push('VoiceCare Encounter Report');
-  lines.push('================================');
   lines.push(`Generated at: ${new Date(report.generatedAt).toLocaleString()}`);
   lines.push(`Patient: ${patient.name || 'N/A'} (${patient.patientId || consultation.patientId || 'N/A'})`);
   lines.push(`Age/Gender: ${patient.age || 'N/A'} / ${patient.gender || 'N/A'}`);
