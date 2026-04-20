@@ -17,6 +17,7 @@ import consultationRoutes from './src/routes/consultations.js';
 import chatRoutes from './src/routes/chat.js';
 import prescriptionRoutes from './src/routes/prescriptions.js';
 import authRoutes from './src/routes/auth.js';
+import { logger } from './src/utils/logger.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -41,7 +42,10 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Request logging (development)
 if (process.env.NODE_ENV === 'development') {
   app.use((req, res, next) => {
-    console.log(`${req.method} ${req.originalUrl}`);
+    logger.info('HTTP', 'Request received', {
+      method: req.method,
+      path: req.originalUrl,
+    });
     next();
   });
 }
@@ -81,16 +85,18 @@ const startServer = async () => {
     await connectDB();
 
     server.listen(PORT, () => {
-      console.log(`
-   🏥 VoiceCare Server Running                                                             ║
-   REST API:  http://localhost:${PORT}/api      
-   WebSocket: ws://localhost:${PORT}            
-   Health:    http://localhost:${PORT}/api/health                                             ║
-   Environment: ${(process.env.NODE_ENV || 'development').padEnd(28)}
-      `);
+      logger.info('Server', 'VoiceCare server started', {
+        port: PORT,
+        restApi: `http://localhost:${PORT}/api`,
+        webSocket: `ws://localhost:${PORT}`,
+        health: `http://localhost:${PORT}/api/health`,
+        env: process.env.NODE_ENV || 'development',
+      });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logger.error('Server', 'Failed to start server', {
+      error: error.message,
+    });
     process.exit(1);
   }
 };

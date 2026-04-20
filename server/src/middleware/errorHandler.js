@@ -1,9 +1,15 @@
+import { logger } from '../utils/logger.js';
+
 /**
  * Global error handler middleware
  */
 export const errorHandler = (err, req, res, next) => {
-  console.error('❌ Error:', err.message);
-  console.error(err.stack);
+  logger.error('API', 'Unhandled error', {
+    method: req.method,
+    path: req.originalUrl,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  });
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
@@ -37,5 +43,9 @@ export const errorHandler = (err, req, res, next) => {
  * 404 handler
  */
 export const notFoundHandler = (req, res) => {
+  logger.warn('API', 'Route not found', {
+    method: req.method,
+    path: req.originalUrl,
+  });
   res.status(404).json({ error: `Route ${req.method} ${req.originalUrl} not found` });
 };

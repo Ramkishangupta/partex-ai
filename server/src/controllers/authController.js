@@ -1,6 +1,7 @@
 import Doctor from '../models/Doctor.js';
 import { generateDoctorId } from '../utils/idGenerator.js';
 import { generateToken } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 
 // POST /api/auth/register - Register a new doctor
 export const register = async (req, res, next) => {
@@ -14,6 +15,9 @@ export const register = async (req, res, next) => {
     // Check if email already exists
     const existing = await Doctor.findOne({ email: email.toLowerCase() });
     if (existing) {
+      logger.warn('AuthService', 'Registration blocked: email already exists', {
+        email: email.toLowerCase(),
+      });
       return res.status(409).json({ error: 'Email already registered' });
     }
 
@@ -28,6 +32,10 @@ export const register = async (req, res, next) => {
     });
 
     await doctor.save();
+    logger.info('AuthService', 'Doctor registration successful', {
+      doctorId: doctor.doctorId,
+      email: doctor.email,
+    });
 
     const token = generateToken(doctor);
 
@@ -57,10 +65,16 @@ export const login = async (req, res, next) => {
 
     const doctor = await Doctor.findOne({ email: email.toLowerCase() });
     if (!doctor || doctor.password !== password) {
+      logger.warn('AuthService', 'Login failed: invalid credentials', {
+        email: email.toLowerCase(),
+      });
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const token = generateToken(doctor);
+    logger.info('AuthService', 'User login successful', {
+      userId: doctor.doctorId,
+    });
 
     res.json({
       success: true,

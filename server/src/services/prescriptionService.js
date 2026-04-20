@@ -1,5 +1,6 @@
 import Consultation from '../models/Consultation.js';
 import Prescription from '../models/Prescription.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Prescription Service - Auto-generate prescriptions from structured data
@@ -38,7 +39,11 @@ export const generatePrescription = async (consultationId, doctorId) => {
   });
 
   await prescription.save();
-  console.log(`✅ Prescription generated for consultation ${consultationId}`);
+  logger.info('PrescriptionService', 'Prescription generated', {
+    consultationId,
+    doctorId,
+    patientId: consultation.patientId,
+  });
   return prescription;
 };
 
