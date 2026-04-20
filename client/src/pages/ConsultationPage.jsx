@@ -332,11 +332,11 @@ export default function ConsultationPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Structured data</p>
-                <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">{JSON.stringify(result.structuredData || {}, null, 2)}</pre>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700 sm:p-4 sm:text-xs">{JSON.stringify(result.structuredData || {}, null, 2)}</pre>
               </div>
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Suggestions</p>
-                <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">{JSON.stringify(result.aiSuggestions || {}, null, 2)}</pre>
+                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700 sm:p-4 sm:text-xs">{JSON.stringify(result.aiSuggestions || {}, null, 2)}</pre>
               </div>
             </div>
           </div>
