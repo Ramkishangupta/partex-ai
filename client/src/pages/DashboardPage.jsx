@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { Search, Users, ShieldAlert, MessageSquare, Plus, ArrowRight, Clock3 } from 'lucide-react';
 
 const emptyPatient = {
   name: '',
@@ -104,120 +105,166 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-8">
-      <section className="grid gap-4 md:grid-cols-4">
-        <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Patients</p>
-          <p className="mt-2 text-3xl font-bold">{stats.total}</p>
-        </div>
-        <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Allergy Cases</p>
-          <p className="mt-2 text-3xl font-bold">{stats.withAllergy}</p>
-        </div>
-        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-emerald-300">Male/Female</p>
-          <p className="mt-2 text-3xl font-bold">{stats.genders.male}/{stats.genders.female}</p>
-        </div>
-        <div className="rounded-2xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-fuchsia-300">Actions</p>
+    <div className="space-y-6">
+      <section className="surface rounded-[2rem] p-6 md:p-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Clinic dashboard</p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Simple patient operations in one place</h1>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              Search patients, open histories, start consultations, and ask record-based questions without visual clutter.
+            </p>
+          </div>
+
           <button
-            className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-900"
+            className="clean-button w-full bg-slate-900 px-5 py-3 text-white lg:w-auto"
             onClick={() => setFormOpen((prev) => !prev)}
+            type="button"
           >
-            {formOpen ? 'Hide Form' : 'Add Patient'}
+            <Plus size={16} /> {formOpen ? 'Close patient form' : 'Add patient'}
           </button>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <span>Patients</span><Users size={16} />
+            </div>
+            <p className="mt-3 text-3xl font-bold text-slate-900">{stats.total}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <span>Allergy cases</span><ShieldAlert size={16} />
+            </div>
+            <p className="mt-3 text-3xl font-bold text-slate-900">{stats.withAllergy}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <span>Male / Female</span><Users size={16} /></div>
+            <p className="mt-3 text-3xl font-bold text-slate-900">{stats.genders.male}/{stats.genders.female}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between text-sm text-slate-500">
+              <span>Quick access</span><Clock3 size={16} />
+            </div>
+            <p className="mt-3 text-sm text-slate-600">Open history, consultation, or chat from each patient card.</p>
+          </div>
         </div>
       </section>
 
-      {error && <p className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
+      {error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
 
       {formOpen && (
-        <form onSubmit={onCreatePatient} className="grid gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 p-5 md:grid-cols-3">
-          <input className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" placeholder="Name" required value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
-          <input className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" placeholder="Age" type="number" value={form.age} onChange={(e) => setForm((prev) => ({ ...prev, age: e.target.value }))} />
-          <select className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" value={form.gender} onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
-          <input className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" placeholder="Phone" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} />
-          <input className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" placeholder="Blood Group" value={form.bloodGroup} onChange={(e) => setForm((prev) => ({ ...prev, bloodGroup: e.target.value }))} />
-          <input className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2" placeholder="Allergies (comma separated)" value={form.allergies} onChange={(e) => setForm((prev) => ({ ...prev, allergies: e.target.value }))} />
-          <button type="submit" disabled={creating} className="rounded-lg bg-cyan-300 px-3 py-2 font-semibold text-slate-900 disabled:opacity-60">
-            {creating ? 'Creating...' : 'Create Patient'}
-          </button>
+        <form onSubmit={onCreatePatient} className="surface rounded-[2rem] p-6">
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-slate-900">Create patient</p>
+            <p className="mt-1 text-sm text-slate-500">Keep the record minimal. More details can be added later.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <input className="clean-input" placeholder="Name" required value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+            <input className="clean-input" placeholder="Age" type="number" value={form.age} onChange={(e) => setForm((prev) => ({ ...prev, age: e.target.value }))} />
+            <select className="clean-input" value={form.gender} onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+            <input className="clean-input" placeholder="Phone" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} />
+            <input className="clean-input" placeholder="Blood group" value={form.bloodGroup} onChange={(e) => setForm((prev) => ({ ...prev, bloodGroup: e.target.value }))} />
+            <input className="clean-input" placeholder="Allergies (comma separated)" value={form.allergies} onChange={(e) => setForm((prev) => ({ ...prev, allergies: e.target.value }))} />
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button type="submit" disabled={creating} className="clean-button bg-slate-900 px-5 py-3 text-white disabled:opacity-60">
+              {creating ? 'Creating...' : 'Save patient'} <ArrowRight size={16} />
+            </button>
+          </div>
         </form>
       )}
 
-      <section className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4 lg:col-span-2">
-          <div className="mb-4 flex flex-wrap gap-3">
+      <section className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+        <div className="surface rounded-[2rem] p-5 md:p-6">
+          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <Search size={18} className="text-slate-500" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, phone, patientId"
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+              placeholder="Search by name, phone, patient ID"
+              className="w-full bg-transparent outline-none"
             />
-            <button className="rounded-lg bg-slate-200 px-4 py-2 font-semibold text-slate-900" onClick={() => fetchPatients(query)}>
+            <button type="button" className="clean-button bg-slate-900 px-4 py-2 text-white" onClick={() => fetchPatients(query)}>
               Search
             </button>
           </div>
 
           {loading ? (
-            <p className="text-slate-300">Loading patients...</p>
+            <div className="space-y-3">
+              <div className="h-20 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="h-20 animate-pulse rounded-2xl bg-slate-100" />
+              <div className="h-20 animate-pulse rounded-2xl bg-slate-100" />
+            </div>
           ) : (
             <div className="space-y-3">
               {patients.map((patient) => (
-                <div key={patient.patientId} className="rounded-xl border border-slate-700/80 bg-slate-800/70 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                <div key={patient.patientId} className="rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="font-semibold">{patient.name}</p>
-                      <p className="text-sm text-slate-300">{patient.patientId} • {patient.gender || 'n/a'} • {patient.age || '-'} yrs</p>
+                      <p className="text-lg font-semibold text-slate-900">{patient.name}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {patient.patientId} • {patient.gender || 'n/a'} • {patient.age || '-'} yrs
+                      </p>
                     </div>
-                    <div className="flex gap-2">
-                      <Link className="rounded-lg bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-900" to={`/consultation?patientId=${patient.patientId}`}>
-                        Start Consultation
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="clean-button border border-slate-200 bg-white px-4 py-2 text-slate-700 hover:bg-slate-50" to={`/patient-history/${patient.patientId}`}>
+                        View history
                       </Link>
-                      <button className="rounded-lg border border-slate-600 px-3 py-2 text-sm" onClick={() => setSelectedPatientId(patient.patientId)}>
-                        Use In Chat
+                      <Link className="clean-button bg-slate-900 px-4 py-2 text-white" to={`/consultation?patientId=${patient.patientId}`}>
+                        Start consultation
+                      </Link>
+                      <button type="button" className="clean-button border border-slate-200 bg-white px-4 py-2 text-slate-700 hover:bg-slate-50" onClick={() => setSelectedPatientId(patient.patientId)}>
+                        Use in chat
                       </button>
                     </div>
                   </div>
                 </div>
               ))}
-              {!patients.length && <p className="text-slate-300">No patients found.</p>}
+              {!patients.length && <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-500">No patients found.</div>}
             </div>
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4">
-          <p className="mb-3 text-sm uppercase tracking-[0.2em] text-slate-400">Patient Q&A</p>
-          <input
-            className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
-            placeholder="Patient ID"
-            value={selectedPatientId}
-            onChange={(e) => setSelectedPatientId(e.target.value)}
-          />
-          <textarea
-            className="mb-3 h-24 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
-            value={chatQuestion}
-            onChange={(e) => setChatQuestion(e.target.value)}
-          />
-          <button className="w-full rounded-lg bg-emerald-300 px-3 py-2 font-semibold text-slate-900" onClick={askQuestion} disabled={chatBusy}>
-            {chatBusy ? 'Asking...' : 'Ask'}
-          </button>
+        <aside className="surface rounded-[2rem] p-5 md:p-6">
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-slate-900">Patient Q&A</p>
+            <p className="mt-1 text-sm text-slate-500">Ask record-based questions using the selected patient ID.</p>
+          </div>
 
-          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950 p-3">
-            <p className="text-sm text-slate-300">{chatAnswer || 'Answers will appear here.'}</p>
+          <div className="space-y-3">
+            <input
+              className="clean-input"
+              placeholder="Patient ID"
+              value={selectedPatientId}
+              onChange={(e) => setSelectedPatientId(e.target.value)}
+            />
+            <textarea
+              className="clean-input min-h-28 resize-none"
+              value={chatQuestion}
+              onChange={(e) => setChatQuestion(e.target.value)}
+            />
+            <button type="button" className="clean-button w-full bg-slate-900 px-4 py-3 text-white disabled:opacity-60" onClick={askQuestion} disabled={chatBusy}>
+              <MessageSquare size={16} /> {chatBusy ? 'Asking...' : 'Ask question'}
+            </button>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm leading-relaxed text-slate-700">{chatAnswer || 'Answers will appear here.'}</p>
             {!!chatSources.length && (
-              <div className="mt-2 space-y-1 text-xs text-slate-400">
+              <div className="mt-3 space-y-1 text-xs text-slate-500">
                 {chatSources.map((src) => (
                   <p key={src.sessionId}>{src.sessionId} • Visit {src.visitNumber}</p>
                 ))}
               </div>
             )}
           </div>
-        </div>
+        </aside>
       </section>
     </div>
   );

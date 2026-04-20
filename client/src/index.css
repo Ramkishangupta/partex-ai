@@ -1,58 +1,88 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
-@theme {
-  --color-blue-50: #eff6ff;
-  --color-blue-100: #dbeafe;
-  --color-blue-200: #bfdbfe;
-  --color-blue-300: #93c5fd;
-  --color-blue-400: #60a5fa;
-  --color-blue-500: #3b82f6;
-  --color-blue-600: #2563eb;
-  --color-blue-700: #1d4ed8;
-  --color-blue-800: #1e40af;
-  --color-blue-900: #1e3a8a;
-}
-
 @layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   html {
     font-family: 'Outfit', system-ui, sans-serif;
+    background: #f8fafc;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top, rgba(148, 163, 184, 0.12), transparent 34%),
+      linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    color: #0f172a;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  ::selection {
+    background: rgba(14, 165, 233, 0.18);
   }
 }
 
-/* Optional Custom Utilities / Animations */
 @layer utilities {
-  .animate-spin-slow {
-    animation: spin 3s linear infinite;
+  .page-shell {
+    max-width: 80rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
   }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.5s ease-out;
-  }
-  
-  .animate-fade-in-up {
-    animation: fadeInUp 0.5s ease-out;
-  }
-}
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes fadeInUp {
-  from { 
-    opacity: 0;
-    transform: translateY(10px);
+  .surface {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
   }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
-.pattern-bg {
-  background-color: #1e293b;
-  background-image: radial-gradient(#334155 1px, transparent 1px);
-  background-size: 20px 20px;
+  .clean-input {
+    width: 100%;
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(255, 255, 255, 0.85);
+    padding: 0.875rem 1rem;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .clean-input:focus {
+    border-color: rgba(14, 165, 233, 0.45);
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.08);
+    background: #fff;
+  }
+
+  .clean-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    padding: 0.8rem 1.1rem;
+    font-weight: 600;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .clean-button:hover {
+    transform: translateY(-1px);
+  }
 }

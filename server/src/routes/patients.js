@@ -5,6 +5,7 @@ import {
   getPatientById,
   updatePatient,
   getPatientHistory,
+  getPatientReport,
 } from '../controllers/patientController.js';
 
 const router = Router();
@@ -14,6 +15,9 @@ router.post('/', createPatient);
 
 // GET /api/patients - List all patients (with optional search)
 router.get('/', getPatients);
+
+// GET /api/patients/:id - Get a single patient by patientId
+router.get('/:id/report', getPatientReport);
 
 // GET /api/patients/:id - Get a single patient by patientId
 router.get('/:id', getPatientById);

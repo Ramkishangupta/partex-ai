@@ -105,7 +105,7 @@ export const transcribeAudioFile = async (audioBuffer, mimetype = 'audio/wav') =
     // Extract the full transcript
     const channels = result?.results?.channels || [];
     const alternatives = channels[0]?.alternatives || [];
-    const transcript = alternatives[0]?.transcript || '';
+    let transcript = alternatives[0]?.transcript || '';
     const confidence = alternatives[0]?.confidence || 0;
     const detectedLanguage = channels[0]?.detected_language || 'unknown';
 
@@ -119,6 +119,11 @@ export const transcribeAudioFile = async (audioBuffer, mimetype = 'audio/wav') =
       confidence: u.confidence,
       language: detectedLanguage,
     }));
+
+    // Some files return utterances but leave alternatives transcript empty.
+    if (!transcript.trim() && segments.length > 0) {
+      transcript = segments.map((s) => s.text).filter(Boolean).join(' ').trim();
+    }
 
     return {
       transcript,

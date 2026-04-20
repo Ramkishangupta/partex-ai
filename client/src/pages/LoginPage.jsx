@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { BriefcaseMedical, ShieldCheck, Sparkles, ArrowRight, Stethoscope } from 'lucide-react';
 
 const defaultRegister = {
   name: '',
@@ -39,28 +40,48 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 gap-8 px-4 py-8 md:grid-cols-2">
-        <section className="rounded-3xl border border-cyan-400/20 bg-slate-900/70 p-8 shadow-2xl backdrop-blur-md">
-          <h1 className="text-4xl font-bold tracking-tight">VoiceCare</h1>
-          <p className="mt-3 text-slate-300">Real-time multilingual clinic assistant for doctors.</p>
-          <div className="mt-8 space-y-3 text-sm text-slate-300">
-            <p>Live transcription over WebSocket</p>
-            <p>Structured medical extraction with LLM</p>
-            <p>Patient history Q&A and prescriptions</p>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 gap-8 px-4 py-8 md:grid-cols-[1.05fr_0.95fr] md:items-center">
+        <section className="surface relative overflow-hidden rounded-[2rem] bg-white p-8 md:p-10">
+          <div className="absolute right-0 top-0 h-56 w-56 translate-x-1/3 -translate-y-1/3 rounded-full bg-sky-100 blur-3xl" />
+          <div className="relative z-10 max-w-xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+              <ShieldCheck size={14} className="text-sky-600" /> Clean clinic workspace
+            </div>
+            <div className="flex items-center gap-3 text-slate-900">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                <BriefcaseMedical size={20} />
+              </span>
+              <h1 className="text-4xl font-bold tracking-tight">VoiceCare</h1>
+            </div>
+            <p className="mt-4 text-lg leading-relaxed text-slate-600">A simple clinic console for patient records, consultations, and history lookup.</p>
+
+            <div className="mt-8 grid gap-3 text-sm text-slate-600">
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Sparkles size={16} className="text-sky-600" /> Fast consultations and clean records
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <Stethoscope size={16} className="text-slate-700" /> Patient timeline and prescriptions in one place
+              </div>
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <ShieldCheck size={16} className="text-emerald-600" /> Secure doctor login and registration
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-700 bg-slate-900/80 p-8 shadow-xl">
-          <div className="mb-6 flex rounded-full bg-slate-800 p-1">
+        <section className="surface rounded-[2rem] bg-white p-6 md:p-8">
+          <div className="mb-6 flex rounded-full border border-slate-200 bg-slate-50 p-1">
             <button
-              className={`w-1/2 rounded-full px-4 py-2 text-sm font-semibold ${mode === 'login' ? 'bg-cyan-300 text-slate-900' : 'text-slate-300'}`}
+              type="button"
+              className={`w-1/2 rounded-full px-4 py-2 text-sm font-semibold transition ${mode === 'login' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500'}`}
               onClick={() => setMode('login')}
             >
               Login
             </button>
             <button
-              className={`w-1/2 rounded-full px-4 py-2 text-sm font-semibold ${mode === 'register' ? 'bg-cyan-300 text-slate-900' : 'text-slate-300'}`}
+              type="button"
+              className={`w-1/2 rounded-full px-4 py-2 text-sm font-semibold transition ${mode === 'register' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500'}`}
               onClick={() => setMode('register')}
             >
               Register
@@ -71,7 +92,7 @@ export default function LoginPage() {
             {mode === 'login' ? (
               <>
                 <input
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
+                  className="clean-input"
                   placeholder="Email"
                   type="email"
                   required
@@ -79,7 +100,7 @@ export default function LoginPage() {
                   onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))}
                 />
                 <input
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
+                  className="clean-input"
                   placeholder="Password"
                   type="password"
                   required
@@ -90,14 +111,14 @@ export default function LoginPage() {
             ) : (
               <>
                 <input
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
+                  className="clean-input"
                   placeholder="Doctor Name"
                   required
                   value={registerForm.name}
                   onChange={(e) => setRegisterForm((prev) => ({ ...prev, name: e.target.value }))}
                 />
                 <input
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
+                  className="clean-input"
                   placeholder="Email"
                   type="email"
                   required
@@ -105,7 +126,7 @@ export default function LoginPage() {
                   onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))}
                 />
                 <input
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
+                  className="clean-input"
                   placeholder="Password"
                   type="password"
                   required
@@ -113,13 +134,13 @@ export default function LoginPage() {
                   onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))}
                 />
                 <input
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
+                  className="clean-input"
                   placeholder="Specialization"
                   value={registerForm.specialization}
                   onChange={(e) => setRegisterForm((prev) => ({ ...prev, specialization: e.target.value }))}
                 />
                 <input
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 outline-none focus:border-cyan-400"
+                  className="clean-input"
                   placeholder="License Number"
                   value={registerForm.licenseNumber}
                   onChange={(e) => setRegisterForm((prev) => ({ ...prev, licenseNumber: e.target.value }))}
@@ -127,14 +148,14 @@ export default function LoginPage() {
               </>
             )}
 
-            {error && <p className="text-sm text-rose-300">{error}</p>}
+            {error && <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
 
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-xl bg-cyan-300 px-4 py-3 font-semibold text-slate-900 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-70"
+              className="clean-button w-full bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {busy ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+              {busy ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'} <ArrowRight size={16} />
             </button>
           </form>
         </section>

@@ -1,5 +1,7 @@
 import Patient from '../models/Patient.js';
+import Prescription from '../models/Prescription.js';
 import { generatePatientId } from '../utils/idGenerator.js';
+import { getPatientSummary } from '../services/ragService.js';
 
 // POST /api/patients - Create a new patient
 export const createPatient = async (req, res, next) => {
@@ -120,3 +122,124 @@ export const getPatientHistory = async (req, res, next) => {
     next(error);
   }
 };
+
+// GET /api/patients/:id/report - Get a doctor-friendly report summary for a patient
+export const getPatientReport = async (req, res, next) => {
+  try {
+    const { default: Consultation } = await import('../models/Consultation.js');
+
+    const patient = await Patient.findOne({ patientId: req.params.id }).lean();
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+
+    const [consultations, prescriptions, summary] = await Promise.all([
+      Consultation.find({ patientId: req.params.id })
+        .sort({ consultationDate: -1 })
+        .lean(),
+      Prescription.find({ patientId: req.params.id })
+        .sort({ createdAt: -1 })
+        .lean(),
+      getPatientSummary(req.params.id),
+    ]);
+
+    const report = {
+      generatedAt: new Date().toISOString(),
+      patient,
+      summary,
+      totalConsultations: consultations.length,
+      totalPrescriptions: prescriptions.length,
+      consultations: consultations.map((consultation) => ({
+        sessionId: consultation.sessionId,
+        visitNumber: consultation.visitNumber,
+        date: consultation.consultationDate,
+        doctorId: consultation.doctorId,
+        chiefComplaint: consultation.structuredData?.chiefComplaint || '',
+        diagnosis: consultation.structuredData?.diagnosis || [],
+        medications: consultation.structuredData?.medications || [],
+        vitals: consultation.structuredData?.vitals || {},
+        followUp: consultation.structuredData?.followUp || '',
+        flaggedIssues: consultation.structuredData?.flaggedIssues || [],
+        transcript: consultation.rawTranscript || '',
+      })),
+      prescriptions: prescriptions.map((prescription) => ({
+        id: prescription._id,
+        consultationId: prescription.consultationId,
+        createdAt: prescription.createdAt,
+        medications: prescription.medications || [],
+        diagnosis: prescription.diagnosis || [],
+        generalInstructions: prescription.generalInstructions || '',
+        followUpDate: prescription.followUpDate || null,
+        validUntil: prescription.validUntil || null,
+      })),
+    };
+
+    const reportText = buildPatientReportText(report);
+
+    if (req.query.format === 'json') {
+      return res.json({
+        success: true,
+        report: {
+          ...report,
+          text: reportText,
+        },
+      });
+    }
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.id}-report.txt"`);
+    return res.send(reportText);
+  } catch (error) {
+    next(error);
+  }
+};
+
+function buildPatientReportText(report) {
+  const lines = [];
+
+  lines.push('VoiceCare Patient Report');
+  lines.push('================================');
+  lines.push(`Generated at: ${new Date(report.generatedAt).toLocaleString()}`);
+  lines.push(`Patient: ${report.patient.name} (${report.patient.patientId})`);
+  lines.push(`Age/Gender: ${report.patient.age || 'N/A'} / ${report.patient.gender || 'N/A'}`);
+  lines.push(`Blood group: ${report.patient.bloodGroup || 'N/A'}`);
+  lines.push(`Phone: ${report.patient.phone || 'N/A'}`);
+  lines.push(`Total consultations: ${report.totalConsultations}`);
+  lines.push(`Total prescriptions: ${report.totalPrescriptions}`);
+  lines.push('');
+  lines.push('SUMMARY');
+  lines.push(`Recent complaint: ${report.summary?.recentComplaint || 'N/A'}`);
+  lines.push(`Diagnoses: ${(report.summary?.diagnoses || []).join(', ') || 'N/A'}`);
+  lines.push(`Medication history: ${(report.summary?.medicationsHistory || []).join(', ') || 'N/A'}`);
+  lines.push(`Known allergies: ${(report.summary?.knownAllergies || []).join(', ') || 'N/A'}`);
+  lines.push('');
+
+  if (report.consultations.length === 0) {
+    lines.push('No consultation records available.');
+  } else {
+    lines.push('CONSULTATIONS');
+    report.consultations.forEach((consultation) => {
+      lines.push(`Encounter #${consultation.visitNumber} | ${consultation.date ? new Date(consultation.date).toLocaleString() : 'Unknown date'}`);
+      lines.push(`Session: ${consultation.sessionId}`);
+      lines.push(`Chief complaint: ${consultation.chiefComplaint || 'N/A'}`);
+      lines.push(`Diagnosis: ${(consultation.diagnosis || []).join(', ') || 'N/A'}`);
+      lines.push(`Medications: ${(consultation.medications || []).map((med) => med.name).join(', ') || 'N/A'}`);
+      lines.push(`Follow-up: ${consultation.followUp || 'N/A'}`);
+      lines.push(`Flags: ${(consultation.flaggedIssues || []).join(', ') || 'N/A'}`);
+      lines.push('');
+    });
+  }
+
+  if (report.prescriptions.length > 0) {
+    lines.push('PRESCRIPTIONS');
+    report.prescriptions.forEach((prescription, index) => {
+      lines.push(`Prescription #${index + 1} | Consultation: ${prescription.consultationId}`);
+      lines.push(`Medications: ${(prescription.medications || []).map((med) => med.name).join(', ') || 'N/A'}`);
+      lines.push(`Instructions: ${prescription.generalInstructions || 'N/A'}`);
+      lines.push(`Follow-up date: ${prescription.followUpDate ? new Date(prescription.followUpDate).toLocaleDateString() : 'N/A'}`);
+      lines.push('');
+    });
+  }
+
+  return lines.join('\n');
+}

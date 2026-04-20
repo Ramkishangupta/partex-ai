@@ -5,6 +5,7 @@ import {
   getConsultationById,
   getConsultations,
   updateConsultation,
+  getConsultationReport,
 } from '../controllers/consultationController.js';
 
 const router = Router();
@@ -28,6 +29,9 @@ router.post('/', upload.single('audio'), createConsultation);
 
 // GET /api/consultations/:sessionId - Get a consultation
 router.get('/:sessionId', getConsultationById);
+
+// GET /api/consultations/:sessionId/report - Get a readable encounter report
+router.get('/:sessionId/report', getConsultationReport);
 
 // GET /api/consultations - List recent consultations
 router.get('/', getConsultations);

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
+import { Mic, Upload, FileText, LoaderCircle, Sparkles, ArrowRight, Download } from 'lucide-react';
 
 export default function ConsultationPage() {
   const [searchParams] = useSearchParams();
@@ -18,6 +19,7 @@ export default function ConsultationPage() {
   const [audioFile, setAudioFile] = useState(null);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [recordingBusy, setRecordingBusy] = useState(false);
+  const [downloadingReport, setDownloadingReport] = useState(false);
 
   const mediaRecorderRef = useRef(null);
   const mediaStreamRef = useRef(null);
@@ -175,104 +177,171 @@ export default function ConsultationPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const downloadReport = async () => {
+    if (!patientId.trim()) {
+      setError('Patient ID is required');
+      return;
+    }
+
+    setDownloadingReport(true);
+    setError('');
+
+    try {
+      const { data } = await api.get(`/patients/${patientId}/report`, { responseType: 'text' });
+      const blob = new Blob([data], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${patientId}-report.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (downloadError) {
+      setError(downloadError?.response?.data?.error || downloadError.message || 'Failed to download report');
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-5">
-        <h1 className="text-2xl font-bold">Voice Consultation</h1>
-        <p className="text-sm text-slate-300">Record voice locally, then send the recording to consultation API for processing.</p>
+      <section className="surface rounded-[2rem] p-6 md:p-8">
+        <div className="max-w-3xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Consultation</p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Record, upload, or paste a transcript</h1>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            This workflow keeps voice capture local and sends the final audio or transcript to the consultation API.
+          </p>
+        </div>
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
           <input
             value={patientId}
             onChange={(e) => setPatientId(e.target.value)}
-            placeholder="Patient ID (e.g. PAT-123456)"
-            className="min-w-[280px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+            placeholder="Patient ID, for example PAT-123456"
+            className="clean-input"
           />
-          {!isRecording ? (
+          <div className="flex flex-wrap gap-3">
+            {!isRecording ? (
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={recordingBusy || uploadBusy}
+                className="clean-button bg-slate-900 px-5 py-3 text-white disabled:opacity-60"
+              >
+                <Mic size={16} /> {recordingBusy ? 'Processing...' : 'Record & process'}
+              </button>
+            ) : (
+              <button type="button" onClick={stopRecording} className="clean-button bg-amber-400 px-5 py-3 text-slate-900">
+                <LoaderCircle size={16} className="animate-spin" /> Stop recording
+              </button>
+            )}
             <button
               type="button"
-              onClick={startRecording}
-              disabled={recordingBusy || uploadBusy}
-              className="rounded-lg bg-rose-300 px-4 py-2 font-semibold text-slate-900 disabled:opacity-60"
+              onClick={downloadReport}
+              disabled={downloadingReport || !patientId.trim()}
+              className="clean-button border border-slate-200 bg-white px-5 py-3 text-slate-700 disabled:opacity-60"
             >
-              {recordingBusy ? 'Processing...' : 'Record & Process'}
+              <Download size={16} /> {downloadingReport ? 'Preparing report...' : 'Download report'}
             </button>
-          ) : (
-            <button type="button" onClick={stopRecording} className="rounded-lg bg-amber-300 px-4 py-2 font-semibold text-slate-900">
-              Stop Recording
-            </button>
-          )}
+          </div>
         </div>
 
-        {statusMessage && <p className="mt-4 rounded-xl border border-cyan-500/50 bg-cyan-500/10 p-3 text-sm text-cyan-100">{statusMessage}</p>}
-
-        {error && <p className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
-
-        <div className="mt-4 text-xs text-slate-400">Session: {sessionId || 'not started'}</div>
-        <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950 p-3">
-          <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">Transcript</p>
-          <p className="text-sm text-slate-200">{finalTranscript || 'Processed transcript will appear here.'}</p>
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Status</p>
+            <p className="mt-2 text-sm text-slate-700">{statusMessage || 'Ready to record or upload.'}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Session</p>
+            <p className="mt-2 text-sm text-slate-700">{sessionId || 'Not started'}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Transcript</p>
+            <p className="mt-2 line-clamp-2 text-sm text-slate-700">{finalTranscript || 'Processed transcript will appear here.'}</p>
+          </div>
         </div>
+
+        {error && <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
       </section>
 
-      <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-5">
-        <h2 className="text-lg font-semibold">Manual Transcript Processing</h2>
-        <p className="text-sm text-slate-300">Paste transcript and process through consultation API if microphone streaming is unavailable.</p>
-        <textarea
-          className="mt-3 h-36 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
-          value={manualTranscript}
-          onChange={(e) => setManualTranscript(e.target.value)}
-          placeholder="Paste doctor-patient transcript..."
-        />
-        <button type="button" onClick={submitManualTranscript} disabled={manualBusy} className="mt-3 rounded-lg bg-emerald-300 px-4 py-2 font-semibold text-slate-900 disabled:opacity-60">
-          {manualBusy ? 'Processing...' : 'Process Transcript'}
-        </button>
-      </section>
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="surface rounded-[2rem] p-6">
+          <div className="mb-4 flex items-center gap-2 text-slate-900">
+            <FileText size={18} className="text-slate-500" />
+            <h2 className="text-lg font-semibold">Manual transcript</h2>
+          </div>
+          <p className="text-sm text-slate-500">Paste a transcript when microphone access is not available.</p>
+          <textarea
+            className="clean-input mt-4 min-h-40 resize-none"
+            value={manualTranscript}
+            onChange={(e) => setManualTranscript(e.target.value)}
+            placeholder="Paste doctor-patient transcript..."
+          />
+          <button type="button" onClick={submitManualTranscript} disabled={manualBusy} className="clean-button mt-4 bg-slate-900 px-5 py-3 text-white disabled:opacity-60">
+            {manualBusy ? 'Processing...' : 'Process transcript'} <ArrowRight size={16} />
+          </button>
+        </div>
 
-      <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-5">
-        <h2 className="text-lg font-semibold">Upload Voice File</h2>
-        <p className="text-sm text-slate-300">Upload an audio file to process through the same consultation route (supports WAV, WebM, OGG, MP3, M4A, MP4).</p>
+        <div className="surface rounded-[2rem] p-6">
+          <div className="mb-4 flex items-center gap-2 text-slate-900">
+            <Upload size={18} className="text-slate-500" />
+            <h2 className="text-lg font-semibold">Voice file upload</h2>
+          </div>
+          <p className="text-sm text-slate-500">Upload an audio file and use the same consultation route for processing.</p>
 
-        <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
           <input
             ref={fileInputRef}
             type="file"
             accept="audio/*,.wav,.webm,.ogg,.mp3,.m4a,.mp4"
             onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-            className="block w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-100"
+            className="clean-input mt-4 file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:text-white"
           />
+
           <button
             type="button"
             onClick={uploadVoiceFile}
-            disabled={uploadBusy}
-            className="rounded-lg bg-cyan-300 px-4 py-2 font-semibold text-slate-900 disabled:opacity-60"
+            disabled={uploadBusy || !audioFile}
+            className="clean-button mt-4 bg-slate-900 px-5 py-3 text-white disabled:opacity-60"
           >
-            {uploadBusy ? 'Uploading...' : 'Upload & Process'}
+            {uploadBusy ? 'Uploading...' : 'Upload & process'} <Sparkles size={16} />
           </button>
-        </div>
 
-        {audioFile && (
-          <p className="mt-3 text-xs text-slate-400">
-            Selected: {audioFile.name} ({Math.ceil(audioFile.size / 1024)} KB)
-          </p>
-        )}
+          {audioFile && (
+            <p className="mt-3 text-xs text-slate-500">
+              Selected: {audioFile.name} ({Math.ceil(audioFile.size / 1024)} KB)
+            </p>
+          )}
+        </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-700 bg-slate-900/70 p-5">
-        <h2 className="text-lg font-semibold">Extraction Result</h2>
+      <section className="surface rounded-[2rem] p-6">
+        <h2 className="text-lg font-semibold text-slate-900">Extraction result</h2>
         {result ? (
-          <div className="mt-3 space-y-3 text-sm">
-            <p><span className="text-slate-400">Success:</span> {String(result.success)}</p>
-            <p><span className="text-slate-400">Session ID:</span> {result.sessionId}</p>
-            <pre className="overflow-auto rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs text-slate-200">
-{JSON.stringify(result.structuredData || {}, null, 2)}
-            </pre>
-            <pre className="overflow-auto rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs text-slate-200">
-{JSON.stringify(result.aiSuggestions || {}, null, 2)}
-            </pre>
+          <div className="mt-4 space-y-4 text-sm">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Success</p>
+                <p className="mt-2 text-sm font-semibold text-slate-900">{String(result.success)}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Session ID</p>
+                <p className="mt-2 text-sm font-semibold text-slate-900">{result.sessionId}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Structured data</p>
+                <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">{JSON.stringify(result.structuredData || {}, null, 2)}</pre>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Suggestions</p>
+                <pre className="overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700">{JSON.stringify(result.aiSuggestions || {}, null, 2)}</pre>
+              </div>
+            </div>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-slate-300">No result yet.</p>
+          <p className="mt-4 text-sm text-slate-500">No result yet.</p>
         )}
       </section>
     </div>
