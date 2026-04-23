@@ -4,6 +4,7 @@ import Consultation from '../models/Consultation.js';
 import { generateSessionId } from '../utils/idGenerator.js';
 import { extractMedicalData, generateDoctorAssist } from '../services/llmService.js';
 import { transcribeAudioFile } from '../services/asrService.js';
+import { generatePrescription } from '../services/prescriptionService.js';
 import { getPatientSummary } from '../services/ragService.js';
 import { generateReportPdfBuffer } from '../services/reportPdfService.js';
 
@@ -63,6 +64,13 @@ export const createConsultation = async (req, res, next) => {
 
       await consultation.save();
 
+      let prescription = null;
+      try {
+        prescription = await generatePrescription(sessionId, doctorId);
+      } catch {
+        // Consultation may not include medications; keep consultation success path.
+      }
+
       return res.status(201).json({
         success: true,
         consultation: {
@@ -73,6 +81,7 @@ export const createConsultation = async (req, res, next) => {
           structuredData,
           aiSuggestions,
           languages: [asrResult.detectedLanguage],
+          prescriptionId: prescription?._id || null,
         },
       });
     }
@@ -109,6 +118,13 @@ export const createConsultation = async (req, res, next) => {
       });
       await consultation.save();
 
+      let prescription = null;
+      try {
+        prescription = await generatePrescription(sessionId, doctorId);
+      } catch {
+        // Consultation may not include medications; keep consultation success path.
+      }
+
       return res.status(201).json({
         success: true,
         consultation: {
@@ -118,11 +134,12 @@ export const createConsultation = async (req, res, next) => {
           transcript: cleanedTranscript,
           structuredData,
           aiSuggestions,
+          prescriptionId: prescription?._id || null,
         },
       });
     }
 
-    // Case 3: Just creating a session (for live recording via WebSocket)
+    // Case 3: Just creating a session placeholder
     const consultation = new Consultation({
       patientId,
       doctorId,
@@ -190,11 +207,12 @@ export const getConsultationReport = async (req, res, next) => {
         diagnosis: consultation.structuredData?.diagnosis || [],
         medications: consultation.structuredData?.medications || [],
         vitals: consultation.structuredData?.vitals || {},
+        allergies: consultation.structuredData?.allergies || [],
         flaggedIssues: consultation.structuredData?.flaggedIssues || [],
         missingInfo: consultation.structuredData?.missingInfo || [],
         followUp: consultation.structuredData?.followUp || '',
         additionalNotes: consultation.structuredData?.additionalNotes || '',
-        transcript: consultation.rawTranscript || '',
+        importantAlerts: deriveImportantAlerts(consultation),
         aiSuggestions: consultation.aiSuggestions || {},
       },
       prescription: prescription
@@ -305,11 +323,16 @@ function buildConsultationReportText(report) {
     lines.push('');
   }
 
+  if (consultation.importantAlerts && consultation.importantAlerts.length > 0) {
+    lines.push('IMPORTANT ALERTS');
+    consultation.importantAlerts.forEach((alert) => {
+      lines.push(`- ${alert}`);
+    });
+    lines.push('');
+  }
+
   lines.push('CLINICAL NOTES');
-  lines.push(consultation.additionalNotes || 'N/A');
-  lines.push('');
-  lines.push('TRANSCRIPT');
-  lines.push(consultation.transcript || 'Not available');
+  lines.push(buildClinicalNotesText(consultation));
   lines.push('');
 
   if (report.prescription) {
@@ -324,6 +347,36 @@ function buildConsultationReportText(report) {
   }
 
   return lines.join('\n');
+}
+
+function deriveImportantAlerts(consultationRecord) {
+  const alerts = [];
+  const structured = consultationRecord?.structuredData || {};
+  const aiSuggestions = consultationRecord?.aiSuggestions || {};
+
+  // 1. Missing Critical Info
+  const missingItems = (Array.isArray(structured.missingInfo) ? structured.missingInfo : []).filter(Boolean);
+  missingItems.forEach(item => alerts.push(`Missing info: ${item}`));
+
+  // 2. AI Warnings
+  const aiWarnings = (Array.isArray(aiSuggestions.warnings) ? aiSuggestions.warnings : []).filter(Boolean);
+  aiWarnings.forEach(warning => alerts.push(`AI warning: ${warning}`));
+
+  // 3. Drug Interactions
+  const interactions = (Array.isArray(aiSuggestions.drugInteractions) ? aiSuggestions.drugInteractions : []).filter(Boolean);
+  interactions.forEach(interaction => {
+    const drugA = interaction?.drug1 || 'Drug A';
+    const drugB = interaction?.drug2 || 'Drug B';
+    const severity = interaction?.severity || 'unknown';
+    const desc = interaction?.description ? ` - ${interaction.description}` : '';
+    alerts.push(`Drug interaction (${severity}): ${drugA} + ${drugB}${desc}`);
+  });
+
+  return alerts;
+}
+
+function buildClinicalNotesText(consultation) {
+  return consultation.additionalNotes || 'N/A';
 }
 
 // PATCH /api/consultations/:sessionId - Update consultation (e.g., doctor edits)

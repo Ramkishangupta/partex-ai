@@ -16,7 +16,6 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.1",
-    "socket.io-client": "^4.8.3",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {

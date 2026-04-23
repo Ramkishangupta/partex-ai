@@ -1,6 +1,4 @@
 import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -20,16 +18,6 @@ import authRoutes from './src/routes/auth.js';
 import { logger } from './src/utils/logger.js';
 
 const app = express();
-const server = http.createServer(app);
-
-// Socket.io setup with CORS
-const io = new Server(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || '*',
-    methods: ['GET', 'POST'],
-  },
-  maxHttpBufferSize: 5 * 1024 * 1024, // 5MB for audio chunks
-});
 
 // ─── MIDDLEWARE ──────────────────────────────────────────
 app.use(cors({
@@ -84,11 +72,10 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
-    server.listen(PORT, () => {
+    app.listen(PORT, () => {
       logger.info('Server', 'VoiceCare server started', {
         port: PORT,
         restApi: `http://localhost:${PORT}/api`,
-        webSocket: `ws://localhost:${PORT}`,
         health: `http://localhost:${PORT}/api/health`,
         env: process.env.NODE_ENV || 'development',
       });
@@ -103,4 +90,4 @@ const startServer = async () => {
 
 startServer();
 
-export { app, server, io };
+export { app };

@@ -10,6 +10,11 @@ import { logger } from '../utils/logger.js';
  * Generate a prescription from consultation structured data
  */
 export const generatePrescription = async (consultationId, doctorId) => {
+  const existingPrescription = await Prescription.findOne({ consultationId, doctorId });
+  if (existingPrescription) {
+    return existingPrescription;
+  }
+
   const consultation = await Consultation.findOne({ sessionId: consultationId, doctorId });
   if (!consultation) {
     throw new Error('Consultation not found');

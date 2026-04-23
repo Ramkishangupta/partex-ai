@@ -202,6 +202,20 @@ export default function ConsultationPage() {
     }
   };
 
+  const structuredData = result?.structuredData || {};
+  const suggestions = result?.aiSuggestions || {};
+  const symptoms = Array.isArray(structuredData.symptoms) ? structuredData.symptoms : [];
+  const diagnoses = Array.isArray(structuredData.diagnosis) ? structuredData.diagnosis : [];
+  const medications = Array.isArray(structuredData.medications) ? structuredData.medications : [];
+  const allergies = Array.isArray(structuredData.allergies) ? structuredData.allergies : [];
+  const flaggedIssues = Array.isArray(structuredData.flaggedIssues) ? structuredData.flaggedIssues : [];
+  const missingInfo = Array.isArray(structuredData.missingInfo) ? structuredData.missingInfo : [];
+
+  const possibleDiagnoses = Array.isArray(suggestions.possibleDiagnoses) ? suggestions.possibleDiagnoses : [];
+  const recommendedTests = Array.isArray(suggestions.recommendedTests) ? suggestions.recommendedTests : [];
+  const warnings = Array.isArray(suggestions.warnings) ? suggestions.warnings : [];
+  const drugInteractions = Array.isArray(suggestions.drugInteractions) ? suggestions.drugInteractions : [];
+
   return (
     <div className="space-y-6">
       <section className="surface rounded-[2rem] p-6 md:p-8">
@@ -330,13 +344,149 @@ export default function ConsultationPage() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Structured data</p>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700 sm:p-4 sm:text-xs">{JSON.stringify(result.structuredData || {}, null, 2)}</pre>
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Chief complaint</p>
+                  <p className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-700">
+                    {structuredData.chiefComplaint || 'Not available'}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Symptoms</p>
+                  {symptoms.length > 0 ? (
+                    <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+                      {symptoms.map((symptom, index) => (
+                        <div key={index} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-slate-700">
+                          <p className="font-semibold text-slate-900">{symptom.name || 'Unnamed symptom'}</p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            Duration: {symptom.duration || 'N/A'} • Severity: {symptom.severity || 'N/A'}
+                          </p>
+                          {symptom.notes ? <p className="mt-1 text-xs text-slate-600">Notes: {symptom.notes}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-600">No symptoms extracted.</p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Diagnosis</p>
+                  {diagnoses.length > 0 ? (
+                    <ul className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-slate-700">
+                      {diagnoses.map((diagnosis, index) => (
+                        <li key={index} className="list-inside list-disc">{diagnosis}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-600">No diagnosis extracted.</p>
+                  )}
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Medications</p>
+                  {medications.length > 0 ? (
+                    <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+                      {medications.map((medication, index) => (
+                        <div key={index} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-slate-700">
+                          <p className="font-semibold text-slate-900">{medication.name || 'Unnamed medication'}</p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {medication.dosage || 'N/A'} • {medication.frequency || 'N/A'} • {medication.duration || 'N/A'}
+                          </p>
+                          {medication.notes ? <p className="mt-1 text-xs text-slate-600">Notes: {medication.notes}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-600">No medications extracted.</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Suggestions</p>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700 sm:p-4 sm:text-xs">{JSON.stringify(result.aiSuggestions || {}, null, 2)}</pre>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Vitals and Follow-up</p>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-700">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {Object.entries(structuredData.vitals || {}).map(([key, value]) => (
+                        <div key={key} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+                          <span className="font-semibold uppercase tracking-[0.12em] text-slate-500">{key}</span>
+                          <p className="mt-1 text-sm text-slate-800">{value || 'N/A'}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-sm"><span className="font-semibold text-slate-900">Follow-up:</span> {structuredData.followUp || 'N/A'}</p>
+                    {structuredData.additionalNotes ? (
+                      <p className="mt-2 text-sm"><span className="font-semibold text-slate-900">Additional notes:</span> {structuredData.additionalNotes}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Allergies, Flags, Missing Info</p>
+                  <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-slate-700">
+                    <p><span className="font-semibold text-slate-900">Allergies:</span> {allergies.length ? allergies.join(', ') : 'None reported'}</p>
+                    <p><span className="font-semibold text-slate-900">Flags:</span> {flaggedIssues.length ? flaggedIssues.join(' | ') : 'None'}</p>
+                    <p><span className="font-semibold text-slate-900">Missing info:</span> {missingInfo.length ? missingInfo.join(' | ') : 'None'}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Doctor assist suggestions</p>
+                  <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-slate-700">
+                    <p className="font-semibold text-slate-900">Possible diagnoses</p>
+                    {possibleDiagnoses.length ? (
+                      <ul className="space-y-2">
+                        {possibleDiagnoses.map((item, index) => (
+                          <li key={index} className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs">
+                            <p className="text-sm font-semibold text-slate-900">{item.condition || 'Unknown condition'} ({item.confidence || 'N/A'})</p>
+                            <p className="mt-1 text-slate-600">{item.reasoning || 'No reasoning provided.'}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-slate-600">No suggested diagnoses.</p>
+                    )}
+
+                    <p className="pt-2 font-semibold text-slate-900">Recommended tests</p>
+                    {recommendedTests.length ? (
+                      <ul className="space-y-1 text-sm">
+                        {recommendedTests.map((test, index) => (
+                          <li key={index} className="list-inside list-disc">
+                            {test.test || 'Unnamed test'} {test.urgency ? `(${test.urgency})` : ''} {test.reason ? `- ${test.reason}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-slate-600">No tests suggested.</p>
+                    )}
+
+                    <p className="pt-2 font-semibold text-slate-900">Warnings</p>
+                    <p className="text-sm">{warnings.length ? warnings.join(' | ') : 'None'}</p>
+
+                    <p className="pt-2 font-semibold text-slate-900">Drug interactions</p>
+                    {drugInteractions.length ? (
+                      <ul className="space-y-1 text-sm">
+                        {drugInteractions.map((item, index) => (
+                          <li key={index} className="list-inside list-disc">
+                            {item.drug1 || 'Drug A'} + {item.drug2 || 'Drug B'}: {item.severity || 'N/A'} {item.effect ? `- ${item.effect}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-slate-600">No interaction warnings.</p>
+                    )}
+                  </div>
+                </div>
+
+                <details className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Raw JSON (debug view)</summary>
+                  <div className="mt-3 grid gap-3">
+                    <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-700">{JSON.stringify(structuredData, null, 2)}</pre>
+                    <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-700">{JSON.stringify(suggestions, null, 2)}</pre>
+                  </div>
+                </details>
               </div>
             </div>
           </div>

@@ -172,7 +172,6 @@ export const getPatientReport = async (req, res, next) => {
         vitals: consultation.structuredData?.vitals || {},
         followUp: consultation.structuredData?.followUp || '',
         flaggedIssues: consultation.structuredData?.flaggedIssues || [],
-        transcript: consultation.rawTranscript || '',
       })),
       prescriptions: prescriptions.map((prescription) => ({
         id: prescription._id,

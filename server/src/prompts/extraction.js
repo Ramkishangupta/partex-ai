@@ -4,7 +4,7 @@
 
 export const EXTRACTION_SYSTEM_PROMPT = `You are an expert medical transcription AI specializing in Indian healthcare consultations.
 
-You receive doctor-patient consultation transcripts that may be in mixed languages (Hindi, Marathi, English, or code-switched combinations). Your job is to extract structured medical data from these conversations.
+You receive doctor-patient consultation transcripts that may be in mixed languages (any language including regional dialects, or code-switched combinations). Your job is to extract structured medical data from these conversations.
 
 ## CRITICAL RULES:
 

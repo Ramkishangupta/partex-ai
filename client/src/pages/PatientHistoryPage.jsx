@@ -165,6 +165,32 @@ export default function PatientHistoryPage() {
     }
   };
 
+  const getImportantAlerts = (consult) => {
+    const structured = consult?.structuredData || {};
+    const aiSuggestions = consult?.aiSuggestions || {};
+    const alerts = [];
+
+    // 1. Missing Critical Info
+    const missingItems = (Array.isArray(structured.missingInfo) ? structured.missingInfo : []).filter(Boolean);
+    missingItems.forEach(item => alerts.push(`Missing info: ${item}`));
+
+    // 2. AI Warnings
+    const aiWarnings = (Array.isArray(aiSuggestions.warnings) ? aiSuggestions.warnings : []).filter(Boolean);
+    aiWarnings.forEach(warning => alerts.push(`AI warning: ${warning}`));
+
+    // 3. Drug Interactions
+    const interactions = (Array.isArray(aiSuggestions.drugInteractions) ? aiSuggestions.drugInteractions : []).filter(Boolean);
+    interactions.forEach(interaction => {
+      const drugA = interaction?.drug1 || 'Drug A';
+      const drugB = interaction?.drug2 || 'Drug B';
+      const severity = interaction?.severity || 'unknown';
+      const desc = interaction?.description ? ` - ${interaction.description}` : '';
+      alerts.push(`Drug interaction (${severity}): ${drugA} + ${drugB}${desc}`);
+    });
+
+    return alerts;
+  };
+
   return (
     <div className="space-y-6 pb-12">
       <section className="surface rounded-[2rem] p-6 md:p-8">
@@ -241,6 +267,7 @@ export default function PatientHistoryPage() {
               const dateObj = new Date(consult.consultationDate);
               const data = consult.structuredData || {};
               const followUp = data.followUp || data.followUpPlan || '';
+              const importantAlerts = getImportantAlerts(consult);
 
               return (
                 <article key={consult._id} className="rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
@@ -255,6 +282,17 @@ export default function PatientHistoryPage() {
                     </div>
                     <div className="text-sm text-slate-500">Doctor: {consult.doctorId || 'Default'}</div>
                   </div>
+
+                  {importantAlerts.length > 0 && (
+                    <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-600">Important alerts</p>
+                      <ul className="mt-2 space-y-1 text-sm text-rose-700">
+                        {importantAlerts.map((alert, index) => (
+                          <li key={index} className="list-inside list-disc">{alert}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   <div className="mt-5 flex gap-3 justify-end">
                     <button

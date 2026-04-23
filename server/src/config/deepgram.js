@@ -18,22 +18,6 @@ export const getDeepgramClient = () => {
   return deepgramClient;
 };
 
-// Default config for live transcription
-export const DEEPGRAM_LIVE_CONFIG = {
-  model: 'nova-2',
-  // language: 'hi',           // Removed fixed language
-  detect_language: true,     // Let Deepgram detect the user's language automatically
-  smart_format: true,        // Punctuation + formatting
-  diarize: true,             // Speaker identification (doctor vs patient)
-  punctuate: true,
-  filler_words: false,       // Remove "um", "uh" etc.
-  interim_results: true,     // Send partial results for live UI
-  endpointing: 500,          // 500ms silence = end of utterance (handles noisy OPD)
-  // encoding: 'linear16',    // REMOVED: Auto-detect WebM from browser
-  // sample_rate: 16000,      // REMOVED: Auto-detect WebM from browser
-  channels: 1,
-};
-
 // Config for pre-recorded audio (file upload fallback)
 export const DEEPGRAM_PRERECORDED_CONFIG = {
   model: 'nova-2',
