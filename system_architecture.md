@@ -696,12 +696,12 @@ flowchart TB
     %% Wiring between layers
     VIEWMODEL <-->|Record/Stop Commands| AUDIO_SUBSYSTEM
     VAD -->|Clean Voice Audio Chunks| WHISPER_ENGINE
-    WHISPER_ENGINE -->|Live Text Stream (Flow)| VIEWMODEL
+    WHISPER_ENGINE -->|"Live Text Stream (Flow)"| VIEWMODEL
     WHISPER_ENGINE -->|Completed Transcript| GEMMA_ENGINE
     GEMMA_ENGINE -->|Structured Medical JSON| VIEWMODEL
     VIEWMODEL <-->|Room DB Repository| SQLITE_DB
     SQLITE_DB <-->|Unsynced Queued Records| CONFLICT_RES
-    HTTP_CLIENT <===>|POST /api/sync (When Online)| CLOUD_API
+    HTTP_CLIENT <===>|"POST /api/sync (When Online)"| CLOUD_API
 
     %% Styling
     style PRESENTATION fill:#0f172a,color:#fff,stroke:#38bdf8,stroke-width:2px

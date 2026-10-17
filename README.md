@@ -317,7 +317,7 @@ flowchart TB
         UI2 -->|Live Mic Audio| STT
         STT -->|Raw Transcript| UI1
         STT -->|Raw Transcript| LLM
-        UI3 -.->|Prompt Config (Assist ON/OFF)| LLM
+        UI3 -.->|"Prompt Config: Assist ON/OFF"| LLM
         LLM -->|Structured Medical JSON| UI1
         LLM -->|Prescription & Notes| LDB
         UI1 -->|Patient & Consult Updates| LDB
