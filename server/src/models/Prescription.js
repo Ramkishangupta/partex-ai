@@ -31,6 +31,22 @@ const prescriptionSchema = new mongoose.Schema({
     default: true,
   },
   validUntil: Date,
+  version: {
+    type: Number,
+    default: 1,
+  },
+  updatedByDoctorId: {
+    type: String,
+    default: 'DOC-DEFAULT',
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  lastModifiedAt: {
+    type: Date,
+    default: Date.now,
+  },
 }, {
   timestamps: true,
 });

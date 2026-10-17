@@ -4,12 +4,19 @@ import { generatePatientId } from '../utils/idGenerator.js';
 import { getPatientSummary } from '../services/ragService.js';
 import { generateReportPdfBuffer } from '../services/reportPdfService.js';
 
-const getDoctorScope = (req) => ({ doctorId: req.doctorId || 'DOC-DEFAULT' });
+const getDoctorScope = (req) => {
+  // If myPatientsOnly is specifically set to 'true', filter by doctorId.
+  // Otherwise default to shared clinic/system access so doctors can view patient records across visits.
+  if (req.query.myPatientsOnly === 'true') {
+    return { doctorId: req.doctorId || 'DOC-DEFAULT' };
+  }
+  return {};
+};
 
 // POST /api/patients - Create a new patient
 export const createPatient = async (req, res, next) => {
   try {
-    const scope = getDoctorScope(req);
+    const doctorId = req.doctorId || 'DOC-DEFAULT';
     const { name, age, gender, phone, address, bloodGroup, allergies, medicalHistory } = req.body;
 
     if (!name) {
@@ -17,7 +24,8 @@ export const createPatient = async (req, res, next) => {
     }
 
     const patient = new Patient({
-      doctorId: scope.doctorId,
+      doctorId,
+      updatedByDoctorId: doctorId,
       patientId: generatePatientId(),
       name,
       age,
@@ -36,17 +44,17 @@ export const createPatient = async (req, res, next) => {
   }
 };
 
-// GET /api/patients - List all patients (with optional search)
+// GET /api/patients - List all patients (with optional search across all doctors)
 export const getPatients = async (req, res, next) => {
   try {
     const scope = getDoctorScope(req);
     const { q, page = 1, limit = 20 } = req.query;
     const skip = (page - 1) * limit;
 
-    let query = { ...scope };
+    let query = { ...scope, isDeleted: { $ne: true } };
     if (q) {
       query = {
-        ...scope,
+        ...query,
         $or: [
           { name: { $regex: q, $options: 'i' } },
           { patientId: { $regex: q, $options: 'i' } },
@@ -70,11 +78,10 @@ export const getPatients = async (req, res, next) => {
   }
 };
 
-// GET /api/patients/:id - Get a single patient by patientId
+// GET /api/patients/:id - Get a single patient by patientId (accessible by any doctor)
 export const getPatientById = async (req, res, next) => {
   try {
-    const scope = getDoctorScope(req);
-    const patient = await Patient.findOne({ patientId: req.params.id, ...scope }).lean();
+    const patient = await Patient.findOne({ patientId: req.params.id, isDeleted: { $ne: true } }).lean();
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
@@ -87,14 +94,19 @@ export const getPatientById = async (req, res, next) => {
 // PUT /api/patients/:id - Update patient
 export const updatePatient = async (req, res, next) => {
   try {
-    const scope = getDoctorScope(req);
     const updates = req.body;
     delete updates.patientId; // Don't allow ID changes
     delete updates.doctorId;
 
+    updates.updatedByDoctorId = req.doctorId || 'DOC-DEFAULT';
+    updates.lastModifiedAt = new Date();
+
     const patient = await Patient.findOneAndUpdate(
-      { patientId: req.params.id, ...scope },
-      updates,
+      { patientId: req.params.id, isDeleted: { $ne: true } },
+      { 
+        $set: updates,
+        $inc: { version: 1 }
+      },
       { new: true, runValidators: true }
     );
 
@@ -108,18 +120,18 @@ export const updatePatient = async (req, res, next) => {
   }
 };
 
-// GET /api/patients/:id/history - Get full visit history
+// GET /api/patients/:id/history - Get full visit history across all doctors
 export const getPatientHistory = async (req, res, next) => {
   try {
-    const scope = getDoctorScope(req);
     const { default: Consultation } = await import('../models/Consultation.js');
 
-    const patient = await Patient.findOne({ patientId: req.params.id, ...scope }).lean();
+    const patient = await Patient.findOne({ patientId: req.params.id, isDeleted: { $ne: true } }).lean();
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    const consultations = await Consultation.find({ patientId: req.params.id, ...scope })
+    // Get all visits of this patient conducted by any doctor
+    const consultations = await Consultation.find({ patientId: req.params.id, isDeleted: { $ne: true } })
       .sort({ consultationDate: -1 })
       .lean();
 
@@ -137,19 +149,18 @@ export const getPatientHistory = async (req, res, next) => {
 // GET /api/patients/:id/report - Get a doctor-friendly report summary for a patient
 export const getPatientReport = async (req, res, next) => {
   try {
-    const scope = getDoctorScope(req);
     const { default: Consultation } = await import('../models/Consultation.js');
 
-    const patient = await Patient.findOne({ patientId: req.params.id, ...scope }).lean();
+    const patient = await Patient.findOne({ patientId: req.params.id, isDeleted: { $ne: true } }).lean();
     if (!patient) {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
     const [consultations, prescriptions, summary] = await Promise.all([
-      Consultation.find({ patientId: req.params.id, ...scope })
+      Consultation.find({ patientId: req.params.id, isDeleted: { $ne: true } })
         .sort({ consultationDate: -1 })
         .lean(),
-      Prescription.find({ patientId: req.params.id, ...scope })
+      Prescription.find({ patientId: req.params.id, isDeleted: { $ne: true } })
         .sort({ createdAt: -1 })
         .lean(),
       getPatientSummary(req.params.id),

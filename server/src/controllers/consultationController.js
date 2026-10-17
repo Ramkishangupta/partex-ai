@@ -163,11 +163,13 @@ export const createConsultation = async (req, res, next) => {
   }
 };
 
-// GET /api/consultations/:sessionId - Get a consultation
+// GET /api/consultations/:sessionId - Get a consultation (accessible across doctors)
 export const getConsultationById = async (req, res, next) => {
   try {
-    const doctorId = getDoctorId(req);
-    const consultation = await Consultation.findOne({ sessionId: req.params.sessionId, doctorId }).lean();
+    const consultation = await Consultation.findOne({ 
+      sessionId: req.params.sessionId,
+      isDeleted: { $ne: true }
+    }).lean();
     if (!consultation) {
       return res.status(404).json({ error: 'Consultation not found' });
     }
@@ -180,15 +182,17 @@ export const getConsultationById = async (req, res, next) => {
 // GET /api/consultations/:sessionId/report - Get a readable report for a specific encounter
 export const getConsultationReport = async (req, res, next) => {
   try {
-    const doctorId = getDoctorId(req);
-    const consultation = await Consultation.findOne({ sessionId: req.params.sessionId, doctorId }).lean();
+    const consultation = await Consultation.findOne({ 
+      sessionId: req.params.sessionId,
+      isDeleted: { $ne: true }
+    }).lean();
     if (!consultation) {
       return res.status(404).json({ error: 'Consultation not found' });
     }
 
     const [patient, prescription, summary] = await Promise.all([
-      Patient.findOne({ patientId: consultation.patientId, doctorId }).lean(),
-      Prescription.findOne({ consultationId: consultation.sessionId, doctorId }).lean(),
+      Patient.findOne({ patientId: consultation.patientId, isDeleted: { $ne: true } }).lean(),
+      Prescription.findOne({ consultationId: consultation.sessionId, isDeleted: { $ne: true } }).lean(),
       getPatientSummary(consultation.patientId),
     ]);
 
@@ -257,10 +261,14 @@ export const getConsultationReport = async (req, res, next) => {
 export const getConsultations = async (req, res, next) => {
   try {
     const doctorId = getDoctorId(req);
-    const { patientId, status, page = 1, limit = 20 } = req.query;
+    const { patientId, status, page = 1, limit = 20, myConsultationsOnly } = req.query;
     const skip = (page - 1) * limit;
 
-    const query = { doctorId };
+    const query = { isDeleted: { $ne: true } };
+    // Only restrict to current doctor if explicitly requested or if no patientId is specified and allDoctors is not requested
+    if (myConsultationsOnly === 'true' || (!patientId && req.query.allDoctors !== 'true')) {
+      query.doctorId = doctorId;
+    }
     if (patientId) query.patientId = patientId;
     if (status) query.status = status;
 
@@ -388,9 +396,15 @@ export const updateConsultation = async (req, res, next) => {
     delete updates.patientId;
     delete updates.doctorId;
 
+    updates.updatedByDoctorId = doctorId;
+    updates.lastModifiedAt = new Date();
+
     const consultation = await Consultation.findOneAndUpdate(
-      { sessionId: req.params.sessionId, doctorId },
-      { $set: updates },
+      { sessionId: req.params.sessionId, isDeleted: { $ne: true } },
+      { 
+        $set: updates,
+        $inc: { version: 1 }
+      },
       { new: true }
     );
 

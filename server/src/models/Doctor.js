@@ -30,6 +30,18 @@ const doctorSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  revokedAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

@@ -15,6 +15,7 @@ import consultationRoutes from './src/routes/consultations.js';
 import chatRoutes from './src/routes/chat.js';
 import prescriptionRoutes from './src/routes/prescriptions.js';
 import authRoutes from './src/routes/auth.js';
+import syncRoutes from './src/routes/sync.js';
 import { logger } from './src/utils/logger.js';
 
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/patients', authenticate, patientRoutes);
 app.use('/api/consultations', authenticate, consultationRoutes);
 app.use('/api/chat', authenticate, chatRoutes);
 app.use('/api/prescriptions', authenticate, prescriptionRoutes);
+app.use('/api/sync', authenticate, syncRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

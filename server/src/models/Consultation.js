@@ -114,6 +114,32 @@ const consultationSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  // Offline-first sync & conflict tracking fields
+  version: {
+    type: Number,
+    default: 1,
+  },
+  updatedByDoctorId: {
+    type: String,
+    default: 'DOC-DEFAULT',
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  lastModifiedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  syncStatus: {
+    type: String,
+    enum: ['synced', 'conflict', 'pending'],
+    default: 'synced',
+  },
+  conflictDetails: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

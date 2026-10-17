@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import Doctor from '../models/Doctor.js';
 import { generateDoctorId } from '../utils/idGenerator.js';
 import { generateToken } from '../middleware/auth.js';
@@ -71,6 +72,18 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Check if account was revoked / deleted
+    if (doctor.isDeleted || doctor.isActive === false) {
+      logger.warn('AuthService', 'Login blocked: doctor account is deactivated or revoked', {
+        doctorId: doctor.doctorId,
+        email: doctor.email,
+      });
+      return res.status(401).json({
+        error: 'This doctor account has been deactivated or removed from the hospital registry.',
+        code: 'ACCOUNT_REVOKED',
+      });
+    }
+
     const token = generateToken(doctor);
     logger.info('AuthService', 'User login successful', {
       userId: doctor.doctorId,
@@ -85,6 +98,62 @@ export const login = async (req, res, next) => {
         specialization: doctor.specialization,
       },
       token,
+      leaseDays: 7,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/auth/verify - Verify doctor token and central status (renews 7-day offline lease)
+export const verifyDoctor = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        valid: false,
+        error: 'Authentication token required',
+        code: 'NO_TOKEN',
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'voicecare_jwt_secret');
+    } catch (jwtErr) {
+      return res.status(401).json({
+        valid: false,
+        error: 'Invalid or expired token',
+        code: 'INVALID_TOKEN',
+      });
+    }
+
+    const doctor = await Doctor.findOne({ doctorId: decoded.doctorId });
+    if (!doctor || doctor.isDeleted || doctor.isActive === false) {
+      logger.warn('AuthService', 'Doctor handshake failed: account revoked or removed', {
+        doctorId: decoded.doctorId,
+      });
+      return res.status(401).json({
+        valid: false,
+        error: 'Doctor account has been revoked or removed from central registry',
+        code: 'ACCOUNT_REVOKED',
+      });
+    }
+
+    const renewedToken = generateToken(doctor);
+
+    res.json({
+      success: true,
+      valid: true,
+      doctor: {
+        doctorId: doctor.doctorId,
+        name: doctor.name,
+        email: doctor.email,
+        specialization: doctor.specialization,
+      },
+      token: renewedToken,
+      leaseDays: 7,
     });
   } catch (error) {
     next(error);

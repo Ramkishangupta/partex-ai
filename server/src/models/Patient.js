@@ -48,6 +48,22 @@ const patientSchema = new mongoose.Schema({
     type: String,
     trim: true,
   }],
+  version: {
+    type: Number,
+    default: 1,
+  },
+  updatedByDoctorId: {
+    type: String,
+    default: 'DOC-DEFAULT',
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  lastModifiedAt: {
+    type: Date,
+    default: Date.now,
+  },
 }, {
   timestamps: true,
 });
