@@ -33,6 +33,13 @@ interface VoiceCareDao {
 
     @Query("""
         SELECT * FROM patients 
+        WHERE isDeleted = 0 AND (doctorId = :doctorId OR updatedByDoctorId = :doctorId)
+        ORDER BY lastModifiedAt DESC
+    """)
+    fun getMyPatients(doctorId: String): Flow<List<PatientEntity>>
+
+    @Query("""
+        SELECT * FROM patients 
         WHERE isDeleted = 0 AND (
             name LIKE '%' || :query || '%' OR 
             patientId LIKE '%' || :query || '%' OR 

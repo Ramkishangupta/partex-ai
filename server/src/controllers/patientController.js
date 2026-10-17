@@ -44,33 +44,48 @@ export const createPatient = async (req, res, next) => {
   }
 };
 
-// GET /api/patients - List all patients (with optional search across all doctors)
+// GET /api/patients - List patients (Doctor's assigned patients by default, or global search across clinic)
 export const getPatients = async (req, res, next) => {
   try {
-    const scope = getDoctorScope(req);
-    const { q, page = 1, limit = 20 } = req.query;
+    const doctorId = req.doctorId || 'DOC-DEFAULT';
+    const { q, page = 1, limit = 50, scope = 'my' } = req.query;
     const skip = (page - 1) * limit;
 
-    let query = { ...scope, isDeleted: { $ne: true } };
-    if (q) {
-      query = {
-        ...query,
-        $or: [
-          { name: { $regex: q, $options: 'i' } },
-          { patientId: { $regex: q, $options: 'i' } },
-          { phone: { $regex: q, $options: 'i' } },
-        ],
-      };
+    let query = { isDeleted: { $ne: true } };
+
+    // When doctor types a search query: search universally across ALL clinic records
+    if (q && q.trim().length > 0) {
+      query.$or = [
+        { name: { $regex: q.trim(), $options: 'i' } },
+        { patientId: { $regex: q.trim(), $options: 'i' } },
+        { phone: { $regex: q.trim(), $options: 'i' } },
+      ];
+    } else if (scope === 'my') {
+      // Default view: Show only this doctor's registered/attended patients
+      query.$or = [
+        { doctorId: doctorId },
+        { updatedByDoctorId: doctorId },
+      ];
     }
 
-    const [patients, total] = await Promise.all([
+    const [patients, total, myCount, allCount] = await Promise.all([
       Patient.find(query).sort({ updatedAt: -1 }).skip(skip).limit(parseInt(limit)).lean(),
       Patient.countDocuments(query),
+      Patient.countDocuments({
+        isDeleted: { $ne: true },
+        $or: [{ doctorId: doctorId }, { updatedByDoctorId: doctorId }],
+      }),
+      Patient.countDocuments({ isDeleted: { $ne: true } }),
     ]);
 
     res.json({
       success: true,
+      currentDoctorId: doctorId,
       patients,
+      counts: {
+        myPatients: myCount,
+        allClinicPatients: allCount,
+      },
       pagination: { page: parseInt(page), limit: parseInt(limit), total, pages: Math.ceil(total / limit) },
     });
   } catch (error) {

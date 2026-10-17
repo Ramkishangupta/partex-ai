@@ -230,6 +230,10 @@ class VoiceCareRepository(
     val allPatients: Flow<List<PatientEntity>> = dao.getAllPatients()
     val pendingSyncCount: Flow<Int> = dao.getPendingSyncCount()
 
+    fun getMyPatients(doctorId: String): Flow<List<PatientEntity>> {
+        return dao.getMyPatients(doctorId)
+    }
+
     fun searchPatients(query: String): Flow<List<PatientEntity>> {
         return dao.searchPatients(query)
     }

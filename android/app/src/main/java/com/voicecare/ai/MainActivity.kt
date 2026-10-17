@@ -164,8 +164,10 @@ class MainActivity : ComponentActivity() {
                     // Step 3: Main Dashboard Screen (Matching Web App)
                     composable("dashboard") {
                         val displayName = activeDoctor?.name ?: "Doctor"
+                        val docId = activeDoctor?.doctorId ?: "DOC-DEFAULT"
                         DashboardScreen(
                             patients = patients,
+                            doctorId = docId,
                             pendingSyncCount = pendingSyncCount,
                             isSyncing = isSyncing,
                             doctorName = displayName,
