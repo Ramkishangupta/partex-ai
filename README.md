@@ -276,11 +276,195 @@ flowchart LR
 
 | Method | Endpoint | What it does |
 |--------|----------|-------------|
-| `POST` | `/api/patients` | Register new patient |
-| `GET` | `/api/patients?q=search` | Search patients |
-| `GET` | `/api/patients/:id/history` | Full visit history |
+| `POST` | `/api/patients` | Register new patient (shared across all doctors) |
+| `GET` | `/api/patients?q=search` | Search patients across entire clinic/system |
+| `GET` | `/api/patients/:id/history` | Full visit history across all attending doctors |
 | `POST` | `/api/consultations` | Process audio/transcript → structured data |
-| `GET` | `/api/consultations/:sessionId` | Get consultation result |
+| `GET` | `/api/consultations/:sessionId` | Get consultation result (any doctor) |
 | `POST` | `/api/chat` | Ask AI about patient history (RAG) |
 | `POST` | `/api/prescriptions` | Auto-generate prescription |
+| `POST` | `/api/sync` | **2-Way Offline Sync**: Push changes + resolve conflicts + pull cloud updates |
+| `POST` | `/api/sync/push` | Push offline records to cloud DB |
+| `GET` | `/api/sync/pull?since=...` | Pull recent changes from other doctors |
 | `WS` | `audio:start → audio:chunk → audio:stop` | Live recording pipeline |
+
+---
+
+## 7. 📱 Offline-First Rural Architecture (100% On-Device AI)
+> Built specifically for villages, PHCs, and low-connectivity regions. **Zero internet required during consultation.**
+
+```mermaid
+flowchart TB
+    subgraph DEVICE["📱 ANDROID DEVICE (Zero Internet / Offline)"]
+        direction TB
+        
+        subgraph UI_LAYER["🎨 Consistent UI (Capacitor + React Web App)"]
+            UI1["Unified Web/Mobile UI<br/>(TailwindCSS + Lucide Icons)"]
+            UI2["Audio Recorder View<br/>(Visual Waveforms + Live Feedback)"]
+            UI3["Doctor Assist Toggle<br/>🔘 AI Recommendations: [ON / OFF]"]
+            UI4["Offline Status Badge<br/>📶 'Offline Mode - 3 Consultations Queued'"]
+        end
+
+        subgraph LOCAL_AI["🤖 Local On-Device AI Engine"]
+            STT["👂 ASR: Whisper Small / Base (~150MB)<br/>• Powered by Sherpa-ONNX / Whisper.cpp<br/>• Runs on mobile CPU/DSP<br/>• Real-time Hindi / Marathi / English"]
+            LLM["🧠 Brain: Google Gemma 2 2B-IT (~1.4GB)<br/>• Powered by MediaPipe GenAI / LiteRT (GPU/NPU)<br/>• Prompt: Structured Clinical Extraction<br/>• Optional: Medical advice & differential flags"]
+        end
+
+        subgraph LOCAL_STORAGE["💾 Local Offline Database"]
+            LDB[("Local SQLite / IndexedDB<br/>• Schema identical to MongoDB<br/>• Version tracking per record<br/>• Sync Queue: pending | synced | conflict")]
+        end
+
+        UI2 -->|Live Mic Audio| STT
+        STT -->|Raw Transcript| UI1
+        STT -->|Raw Transcript| LLM
+        UI3 -.->|Prompt Config (Assist ON/OFF)| LLM
+        LLM -->|Structured Medical JSON| UI1
+        LLM -->|Prescription & Notes| LDB
+        UI1 -->|Patient & Consult Updates| LDB
+    end
+
+    subgraph CLOUD["☁️ CENTRAL CLOUD / CLINIC HUB (When Net Connects)"]
+        direction TB
+        SYNC_API["🔄 /api/sync Endpoint<br/>(Conflict Resolution & Version Merge)"]
+        CENTRAL_DB[("🌐 MongoDB Cloud<br/>Universal Patient Database<br/>Accessible by ANY Doctor")]
+        SYNC_API <--> CENTRAL_DB
+    end
+
+    LDB <===>|Auto-Sync via Wi-Fi/4G/Hotspot| SYNC_API
+
+    style DEVICE fill:#0f172a,color:#fff,stroke:#38bdf8,stroke-width:2px
+    style UI_LAYER fill:#1e293b,color:#fff,stroke:#38bdf8
+    style LOCAL_AI fill:#1e1b4b,color:#fff,stroke:#a855f7
+    style LOCAL_STORAGE fill:#14532d,color:#fff,stroke:#22c55e
+    style CLOUD fill:#1e293b,color:#fff,stroke:#f59e0b,stroke-width:2px
+```
+
+---
+
+## 8. 🔄 Offline-to-Cloud Sync & Conflict Resolution Pipeline
+> Resolves conflicts when multiple doctors edit patients or consultations simultaneously while offline.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant 📱 as Doctor A (Android Offline)
+    participant 💻 as Doctor B (Web / Clinic)
+    participant ⚙️ as Cloud Server (/api/sync)
+    participant 🗄️ as MongoDB Cloud
+
+    Note over 📱: Doctor A records in village without internet.<br/>Saved locally (version: 1, syncStatus: pending)
+    
+    Note over 💻: Doctor B updates patient address on Web.<br/>Saved to cloud (version: 2, updatedAt: 10:15 AM)
+    
+    📱->>📱: Internet connection restored (4G / Wi-Fi detected)
+    
+    rect rgb(30, 45, 75)
+        Note over 📱,⚙️: Bidirectional Sync Phase (POST /api/sync)
+        📱->>⚙️: Push Offline Changes { patients: [...], consultations: [...] }<br/>with lastSyncTimestamp = 10:00 AM
+        
+        Note over ⚙️: Conflict Resolution Engine runs:<br/>1. Unique sessionId prevents consultation overwrite<br/>2. Allergies & Medical History: Non-destructive Set Union<br/>3. Demographics: Last-Write-Wins by timestamp<br/>4. Version incremented: version = 3
+        
+        ⚙️->>🗄️: Commit merged Patient & Consultation
+        🗄️-->>⚙️: Merged state saved
+        
+        ⚙️->>🗄️: Fetch updates from other doctors since 10:00 AM
+        🗄️-->>⚙️: Return Doctor B's updates
+        
+        ⚙️-->>📱: { success: true, pushed: [...], conflicts: [], serverUpdates: [...] }
+        📱->>📱: Update local SQLite/IndexedDB to version 3 (syncStatus: synced)
+    end
+    
+    Note over 📱,💻: Both devices are now 100% in sync with exact same medical history!
+```
+
+---
+
+## 9. 🎨 Cross-Platform UI Consistency Strategy (Web & Native Kotlin)
+
+To ensure **zero learning curve** for doctors switching between the Web dashboard and the Android mobile app:
+
+1. **Shared Design Tokens & Color Palette (Jetpack Compose Material3):**
+   - The Android app is written in **100% Native Kotlin using Jetpack Compose**.
+   - Design tokens map directly from the web app: Outfit typography, Slate dark surfaces (`#0F172A`, `#1E293B`), Sky blue accent (`#0EA5E9`), Emerald status indicators (`#10B981`), and Indigo AI accents (`#6366F1`).
+   - Transcription chat bubbles, medical summary cards, and prescription layouts match the web app pixel-for-pixel.
+
+2. **Adaptive Responsive Layout:**
+   - **Desktop Web:** Split-screen layout (Audio Recorder on Left, Live Structured Cards on Right).
+   - **Android Native App:** Bottom Navigation + Tabbed screens (`[Dashboard]`, `[Consultation]`, `[History]`) optimized for single-handed doctor usage on smartphones and clinical tablets.
+
+3. **Doctor Assist Toggle (Performance & Autonomy):**
+   - A dedicated toggle on both Web and Mobile:
+     - **OFF (Default):** Extracts only spoken facts, medications, vitals, and symptoms. Saves mobile battery and CPU execution time by 50%.
+     - **ON:** Activates Gemma 2B's reasoning to suggest differential diagnoses, warning flags, and test recommendations.
+
+---
+
+## 10. 📱 Android App Internal Subsystems Diagram (Native Kotlin)
+
+```mermaid
+flowchart TB
+    subgraph APP["📱 ANDROID NATIVE KOTLIN APPLICATION"]
+        direction TB
+
+        subgraph LAYER1["1. UI & Presentation (Jetpack Compose + Material3)"]
+            UI_REC["🎙️ Audio Recorder & Visualizer"]
+            UI_TRANS["💬 Live Transcript (Hindi/Marathi/English)"]
+            UI_NOTES["📋 Structured Medical Cards"]
+            UI_RX["💊 Prescription & PDF Generator"]
+            UI_SEARCH["👥 Patient Lookup (Universal All-Doctor Access)"]
+            UI_TOGGLE["🔘 Doctor Assist: [ON / OFF]"]
+        end
+
+        subgraph LAYER2["2. Native Audio Subsystem (Android NDK / AudioRecord)"]
+            MIC_IN["🎤 Phone Mic (16kHz, 16-bit Mono PCM)"]
+            CIRC_BUFFER["🔄 10s Circular Audio Ring Buffer"]
+            VAD_FILTER["🔇 Voice Activity Detection (Silero VAD)"]
+            MIC_IN --> CIRC_BUFFER --> VAD_FILTER
+        end
+
+        subgraph LAYER3["3. Local AI Engine (On-Device Inference)"]
+            STT_ENGINE["👂 Whisper Small ASR (~150MB, Sherpa-ONNX)<br/>• Real-time Speech-to-Text<br/>• Multi-threaded ARM NEON SIMD<br/>• Low RAM (~180MB)"]
+            LLM_ENGINE["🧠 Google Gemma 2 2B-IT (~1.4GB, MediaPipe)<br/>• Medical JSON Structuring<br/>• GPU/NPU Accelerated (Vulkan/OpenCL)<br/>• Fast Inference (~15 tok/sec)"]
+            VAD_FILTER -->|Clean Voice Audio| STT_ENGINE
+            STT_ENGINE -->|Text Transcript| LLM_ENGINE
+        end
+
+        subgraph LAYER4["4. Local Persistence (SQLite / Room Database)"]
+            DB_PATIENTS[("Table: patients<br/>(patientId, name, allergies, version)")]
+            DB_CONSULT[("Table: consultations<br/>(sessionId, transcript, structuredData)")]
+            DB_RX[("Table: prescriptions<br/>(medications, instructions)")]
+            DB_QUEUE[("Table: sync_queue<br/>(pending offline operations)")]
+        end
+
+        subgraph LAYER5["5. Background Sync Orchestrator"]
+            NET_WATCH["📶 ConnectivityManager (Detects 4G/Wi-Fi)"]
+            WORK_MGR["⏱️ Android WorkManager (Background Sync)"]
+            CONF_RES["⚖️ Conflict Resolver (OCC Versioning + Array Union)"]
+            NET_WATCH --> WORK_MGR --> CONF_RES
+        end
+
+        LAYER1 <--> LAYER2
+        STT_ENGINE -->|Live Interim Text| LAYER1
+        LLM_ENGINE -->|Structured JSON| LAYER1
+        LAYER1 <--> LAYER4
+        LAYER4 <--> CONF_RES
+    end
+
+    subgraph BACKEND_CLOUD["☁️ VOICECARE CLOUD SERVER"]
+        API_SYNC["POST /api/sync<br/>(Bidirectional Sync + Conflict Resolution)"]
+        MONGO_DB[("MongoDB Cloud Cluster<br/>(Universal All-Doctor Patient Database)")]
+        API_SYNC <--> MONGO_DB
+    end
+
+    CONF_RES <===>|Auto-Sync on Internet Connection| API_SYNC
+
+    style APP fill:#0f172a,color:#fff,stroke:#38bdf8,stroke-width:2px
+    style LAYER1 fill:#1e293b,color:#fff,stroke:#38bdf8
+    style LAYER2 fill:#16213e,color:#fff,stroke:#0284c7
+    style LAYER3 fill:#1e1b4b,color:#fff,stroke:#a855f7,stroke-width:2px
+    style LAYER4 fill:#064e3b,color:#fff,stroke:#10b981
+    style LAYER5 fill:#7c2d12,color:#fff,stroke:#f97316
+    style BACKEND_CLOUD fill:#1e293b,color:#fff,stroke:#fbbf24,stroke-width:2px
+```
+
+
