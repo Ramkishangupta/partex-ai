@@ -11,9 +11,9 @@
     <application
         android:name=".VoiceCareApplication"
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_dialog_info"
+        android:icon="@mipmap/ic_launcher"
         android:label="VoiceCare AI"
-        android:roundIcon="@android:drawable/ic_dialog_info"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:usesCleartextTraffic="true">

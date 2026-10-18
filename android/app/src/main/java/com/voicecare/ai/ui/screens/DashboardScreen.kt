@@ -1,6 +1,7 @@
 package com.voicecare.ai.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,9 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.voicecare.ai.R
 import com.voicecare.ai.data.local.entities.PatientEntity
 import com.voicecare.ai.ui.theme.*
 import java.util.UUID
@@ -85,15 +88,13 @@ fun DashboardScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_voicecare_logo),
+                            contentDescription = "VoiceCare AI",
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Slate900),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.LocalHospital, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        }
+                        )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text("VoiceCare", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Slate900)
                     }
