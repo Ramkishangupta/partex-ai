@@ -39,7 +39,6 @@ fun DashboardScreen(
     onAddPatientSubmit: (PatientEntity) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var activeTab by remember { mutableStateOf("my") } // "my" or "all"
     var isFormOpen by remember { mutableStateOf(false) }
 
     // Patient Form State
@@ -59,31 +58,27 @@ fun DashboardScreen(
     val myPatients = remember(patients, doctorId) {
         patients.filter { it.doctorId == doctorId || it.updatedByDoctorId == doctorId }
     }
-    val myCount = myPatients.size
-    val allCount = patients.size
 
-    val filteredPatients = remember(searchQuery, activeTab, patients, doctorId) {
+    val filteredPatients = remember(searchQuery, patients, myPatients) {
         if (searchQuery.isNotBlank()) {
-            // Universal Search across entire clinic network
+            // Search across clinic records when doctor actively searches
             patients.filter {
                 it.name.contains(searchQuery, ignoreCase = true) ||
                 it.patientId.contains(searchQuery, ignoreCase = true) ||
                 it.phone.contains(searchQuery)
             }
-        } else if (activeTab == "my") {
-            // Default view: Show only this doctor's patients
-            myPatients
         } else {
-            patients
+            // Default view: Show ONLY this doctor's patients (repeat patients)
+            myPatients
         }
     }
 
-    val statsAllergiesCount = remember(patients) {
-        patients.count { it.allergies.isNotBlank() }
+    val statsAllergiesCount = remember(myPatients) {
+        myPatients.count { it.allergies.isNotBlank() }
     }
 
-    val maleCount = remember(patients) { patients.count { it.gender.equals("male", ignoreCase = true) } }
-    val femaleCount = remember(patients) { patients.count { it.gender.equals("female", ignoreCase = true) } }
+    val maleCount = remember(myPatients) { myPatients.count { it.gender.equals("male", ignoreCase = true) } }
+    val femaleCount = remember(myPatients) { myPatients.count { it.gender.equals("female", ignoreCase = true) } }
 
     Scaffold(
         topBar = {
@@ -389,66 +384,11 @@ fun DashboardScreen(
                 }
             }
 
-            // Scope Tabs: My Patients vs All Clinic Records
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (activeTab == "my" && searchQuery.isBlank()) Slate900 else Slate100,
-                            modifier = Modifier.clickable { activeTab = "my" }
-                        ) {
-                            Text(
-                                "👤 My Patients ($myCount)",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (activeTab == "my" && searchQuery.isBlank()) Color.White else Slate600
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (activeTab == "all" && searchQuery.isBlank()) Slate900 else Slate100,
-                            modifier = Modifier.clickable { activeTab = "all" }
-                        ) {
-                            Text(
-                                "🌐 All Clinic ($allCount)",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (activeTab == "all" && searchQuery.isBlank()) Color.White else Slate600
-                            )
-                        }
-                    }
-
-                    if (searchQuery.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Sky50
-                        ) {
-                            Text(
-                                "🔍 Universal Search",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Sky600
-                            )
-                        }
-                    }
-                }
-            }
-
             // Patient List Header Section
             item {
                 Text(
                     if (searchQuery.isNotBlank()) "Search Results (${filteredPatients.size})"
-                    else if (activeTab == "my") "My Patient Directory (${filteredPatients.size})"
-                    else "All Clinic Patients (${filteredPatients.size})",
+                    else "Recent Patients (${filteredPatients.size})",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = Slate900,
@@ -474,9 +414,8 @@ fun DashboardScreen(
                                 Icon(Icons.Default.PersonSearch, contentDescription = null, modifier = Modifier.size(48.dp), tint = Slate400)
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Text(
-                                    if (searchQuery.isNotBlank()) "No patient matches '$searchQuery' in clinic records."
-                                    else if (activeTab == "my") "No patients registered under you yet. Tap '+ Add Patient'."
-                                    else "No patients found in clinic records.",
+                                    if (searchQuery.isNotBlank()) "No patient matches '$searchQuery'."
+                                    else "No registered patients yet. Tap '+ Add Patient'.",
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 13.sp,
                                     color = Slate600
@@ -487,10 +426,8 @@ fun DashboardScreen(
                 }
             } else {
                 items(filteredPatients) { patient ->
-                    val isMyPatient = (patient.doctorId == doctorId || patient.updatedByDoctorId == doctorId)
                     WebStylePatientCard(
                         patient = patient,
-                        isMyPatient = isMyPatient,
                         onViewHistory = { onPatientClick(patient.patientId) },
                         onStartConsultation = { onStartConsultationClick(patient.patientId) },
                         onUseInChat = { selectedPatientIdForChat = patient.patientId }
@@ -600,7 +537,6 @@ private fun StatCard(title: String, value: String, icon: androidx.compose.ui.gra
 @Composable
 private fun WebStylePatientCard(
     patient: PatientEntity,
-    isMyPatient: Boolean = true,
     onViewHistory: () -> Unit,
     onStartConsultation: () -> Unit,
     onUseInChat: () -> Unit
@@ -619,22 +555,10 @@ private fun WebStylePatientCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(patient.name, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Slate900)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        if (isMyPatient) {
-                            Surface(shape = RoundedCornerShape(4.dp), color = Emerald50) {
-                                Text("My Patient", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, color = Emerald600, fontWeight = FontWeight.Bold)
-                            }
-                        } else {
-                            Surface(shape = RoundedCornerShape(4.dp), color = Sky50) {
-                                Text("Clinic Network", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, color = Sky600, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+                    Text(patient.name, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Slate900)
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        "${patient.patientId} • ${patient.gender.uppercase()} • ${patient.age} yrs" + if (patient.phone.isNotBlank()) " • 📞 ${patient.phone}" else "",
+                        "${patient.patientId} • ${patient.gender.lowercase()} • ${patient.age} yrs" + if (patient.phone.isNotBlank()) " • 📞 ${patient.phone}" else "",
                         fontSize = 13.sp,
                         color = Slate500
                     )
