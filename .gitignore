@@ -5,3 +5,11 @@ dist/
 *.log
 phone_screen.png
 *.png
+!client/public/*.png
+!client/src/assets/*.png
+!Blue Medical Cross Soundwave Icon.png
+
+# AI Model Binaries
+*.onnx
+*.bin
+android/app/src/main/assets/sherpa-onnx/

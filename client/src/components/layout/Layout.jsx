@@ -18,10 +18,13 @@ export default function Layout() {
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div className="page-shell flex w-full items-center justify-between py-4">
           <Link to="/" className="flex items-center gap-3 text-lg font-semibold tracking-tight text-slate-900">
-            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-sm">
-              <BriefcaseMedical size={18} />
+            <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+              <img src="/logo.png" alt="VoiceCare AI" className="h-full w-full object-cover" />
             </span>
-            <span>VoiceCare</span>
+            <div className="flex flex-col">
+              <span className="text-base font-bold tracking-tight text-slate-900 leading-tight">VoiceCare</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-600">AI Clinic</span>
+            </div>
           </Link>
 
           <nav className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white p-1 md:flex">

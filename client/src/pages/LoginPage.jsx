@@ -49,10 +49,13 @@ export default function LoginPage() {
               <ShieldCheck size={14} className="text-sky-600" /> Clean clinic workspace
             </div>
             <div className="flex items-center gap-3 text-slate-900">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
-                <BriefcaseMedical size={20} />
+              <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <img src="/logo.png" alt="VoiceCare AI" className="h-full w-full object-cover" />
               </span>
-              <h1 className="text-4xl font-bold tracking-tight">VoiceCare</h1>
+              <div>
+                <h1 className="text-4xl font-bold tracking-tight">VoiceCare</h1>
+                <span className="text-xs font-semibold uppercase tracking-widest text-sky-600">AI Clinical Platform</span>
+              </div>
             </div>
             <p className="mt-4 text-lg leading-relaxed text-slate-600">A simple clinic console for patient records, consultations, and history lookup.</p>
 
