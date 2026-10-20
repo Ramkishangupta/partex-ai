@@ -103,13 +103,20 @@ class MainActivity : ComponentActivity() {
                     } else "login"
                 }
 
-                // If logged in and models ready, navigate to dashboard
+                // If logged in and models ready, navigate to dashboard; if not logged in, redirect to login screen
                 LaunchedEffect(activeDoctor) {
                     if (activeDoctor != null && activeDoctor?.isActiveSession == true && !activeDoctor!!.isRevoked) {
                         val currentRoute = navController.currentBackStackEntry?.destination?.route
                         if (currentRoute == "login" || currentRoute == null) {
                             navController.navigate("dashboard") {
                                 popUpTo("login") { inclusive = true }
+                            }
+                        }
+                    } else if (activeDoctor == null || activeDoctor?.isActiveSession != true || activeDoctor?.isRevoked == true) {
+                        val currentRoute = navController.currentBackStackEntry?.destination?.route
+                        if (currentRoute != "login" && currentRoute != "setup_download" && currentRoute != null) {
+                            navController.navigate("login") {
+                                popUpTo(0) { inclusive = true }
                             }
                         }
                     }

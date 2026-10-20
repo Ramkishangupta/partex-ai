@@ -92,8 +92,6 @@ dependencies {
     // MediaPipe GenAI (On-Device Gemma 2B Inference)
     implementation("com.google.mediapipe:tasks-genai:0.10.14")
     
-    // Sherpa-ONNX (Offline Streaming ASR on Android)
-    implementation("com.github.k2-fsa:sherpa-onnx:v1.13.8") {
-        exclude(group = "com.github.k2-fsa.sherpa-onnx", module = "sherpa-onnx-jvm")
-    }
+    // Sherpa-ONNX (Offline Whisper STT on Android)
+    // implementation("com.github.k2-fsa:sherpa-onnx:v1.10.25")
 }
