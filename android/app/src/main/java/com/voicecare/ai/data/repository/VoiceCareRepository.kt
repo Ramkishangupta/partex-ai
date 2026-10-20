@@ -104,8 +104,13 @@ class VoiceCareRepository(
                 NetworkClient.authToken = updated.token
                 return updated
             } else if (verifyResp.code() == 401) {
-                // Central registry revoked this doctor!
-                revokeDoctorAccess("Doctor account has been deactivated or removed from the central registry.")
+                val errorStr = verifyResp.errorBody()?.string() ?: ""
+                if (errorStr.contains("ACCOUNT_REVOKED", ignoreCase = true)) {
+                    revokeDoctorAccess("Doctor account has been deactivated by hospital administration.")
+                } else {
+                    dao.clearActiveDoctorSessions()
+                    NetworkClient.authToken = null
+                }
                 return null
             }
         } catch (e: Exception) {
@@ -124,6 +129,7 @@ class VoiceCareRepository(
 
     suspend fun loginDoctor(email: String, password: String): Result<DoctorEntity> {
         val cleanEmail = email.trim().lowercase()
+        var networkError: String? = null
 
         // 1. Attempt Online Verification with Hosted Central MongoDB
         try {
@@ -161,31 +167,24 @@ class VoiceCareRepository(
                 } catch (e: Exception) {
                     "Authentication failed with status ${response.code()}."
                 }
-
-                if (response.code() == 401 || response.code() == 403 || response.code() == 400) {
-                    return Result.failure(Exception(parsedError))
-                } else {
-                    return Result.failure(Exception("Server returned HTTP ${response.code()}: $parsedError"))
-                }
+                return Result.failure(Exception(parsedError))
             }
+        } catch (e: java.net.SocketTimeoutException) {
+            networkError = "Server is taking too long to respond. Please check your network and try again."
+        } catch (e: java.net.ConnectException) {
+            networkError = "Cannot connect to server. Please check your internet connection or server settings."
+        } catch (e: java.net.UnknownHostException) {
+            networkError = "Cannot reach server host. Please check your internet connection."
         } catch (e: IOException) {
-            // Device offline -> Fallback to Offline Auth
+            networkError = "Network error while connecting to server. Please check your internet connection."
         } catch (e: Exception) {
-            // Network failure -> Fallback to Offline Auth
+            networkError = e.message ?: "Authentication error"
         }
 
         // 2. Offline Mode: Check Cached Doctor in Local SQLite (Room DB)
         val cachedDoctor = dao.getDoctorByEmail(cleanEmail)
-        return if (cachedDoctor != null) {
-            if (cachedDoctor.isRevoked) {
-                Result.failure(Exception("This doctor account was revoked by central administration."))
-            } else if (System.currentTimeMillis() > cachedDoctor.leaseExpiresAt) {
-                Result.failure(
-                    Exception(
-                        "Your 7-day offline access lease has expired. Please connect to the internet once to re-verify your doctor credentials."
-                    )
-                )
-            } else if (cachedDoctor.passwordHash.isEmpty() || cachedDoctor.passwordHash == password) {
+        if (cachedDoctor != null && !cachedDoctor.isRevoked && (cachedDoctor.passwordHash.isEmpty() || cachedDoctor.passwordHash == password)) {
+            if (System.currentTimeMillis() <= cachedDoctor.leaseExpiresAt) {
                 val activeDoctor = cachedDoctor.copy(
                     isActiveSession = true,
                     lastLoginAt = System.currentTimeMillis()
@@ -193,17 +192,13 @@ class VoiceCareRepository(
                 dao.clearActiveDoctorSessions()
                 dao.upsertDoctor(activeDoctor)
                 NetworkClient.authToken = activeDoctor.token
-                Result.success(activeDoctor)
-            } else {
-                Result.failure(Exception("Incorrect password for cached offline doctor account."))
+                return Result.success(activeDoctor)
             }
-        } else {
-            Result.failure(
-                Exception(
-                    "First-time doctor verification requires an internet connection to verify credentials with the central hospital registry. Please connect to the internet."
-                )
-            )
         }
+
+        return Result.failure(
+            Exception(networkError ?: "Cannot reach server. Please check your internet connection or server settings.")
+        )
     }
 
     suspend fun revokeDoctorAccess(reason: String = "Account revoked by central registry") {

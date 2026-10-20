@@ -59,13 +59,13 @@ object NetworkClient {
 
                 val response = chain.proceed(requestBuilder.build())
 
-                // Check for Central Registry Revocation signal
+                // Check for Central Registry Revocation signal (ONLY on explicit ACCOUNT_REVOKED, never on normal timeout/expiry)
                 if (response.code == 401) {
                     val peekBody = response.peekBody(1024).string()
-                    if (peekBody.contains("ACCOUNT_REVOKED") || peekBody.contains("revoked")) {
+                    if (peekBody.contains("ACCOUNT_REVOKED")) {
                         authToken = null
                         onAccountRevokedListener?.invoke(
-                            "Doctor account has been revoked or removed from central registry by administrator."
+                            "Doctor account has been deactivated by hospital administration."
                         )
                     }
                 }
@@ -74,9 +74,9 @@ object NetworkClient {
             }
 
             val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(45, TimeUnit.SECONDS)
+                .writeTimeout(45, TimeUnit.SECONDS)
                 .addInterceptor(authInterceptor)
                 .addInterceptor(loggingInterceptor)
                 .build()

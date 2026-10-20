@@ -280,6 +280,76 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Slate50)
             )
         },
+        bottomBar = {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White,
+                shadowElevation = 8.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        val medCount = extractedData?.optJSONArray("medications")?.length() ?: 0
+                        val diagCount = extractedData?.optJSONArray("diagnosis")?.length() ?: 0
+                        Text(
+                            if (medCount > 0 || diagCount > 0) "$medCount Meds • $diagCount Diag" else "Draft Consultation",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Slate900
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Emerald600)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "Offline Encrypted DB",
+                                fontSize = 10.sp,
+                                color = Emerald600,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            val conflict = findDrugAllergyConflict()
+                            if (conflict != null && !allergyOverrideConfirmed) {
+                                conflictingAllergyName = conflict.first
+                                conflictingDrugName = conflict.second
+                                showAllergyConfirmDialog = true
+                            } else {
+                                saveConsultationToLocalDb()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                        enabled = !isSaving
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Saving...", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Save Consultation", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        },
         containerColor = Slate50
     ) { padding ->
         LazyColumn(
@@ -287,45 +357,158 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 90.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp)
         ) {
+            // 0. Patient OPD Context Header Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Slate200),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(CircleShape)
+                                    .background(Sky100),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = Sky600,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    patientEntity?.name ?: patientId ?: "OPD Patient Walk-In",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Slate900
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                val metaText = buildString {
+                                    if (patientEntity != null && patientEntity!!.age > 0) append("${patientEntity!!.age} Yrs")
+                                    if (patientEntity != null && patientEntity!!.gender.isNotBlank()) {
+                                        if (isNotEmpty()) append(" • ")
+                                        append(patientEntity!!.gender.replaceFirstChar { it.uppercase() })
+                                    }
+                                    if (patientEntity != null && patientEntity!!.bloodGroup.isNotBlank()) {
+                                        if (isNotEmpty()) append(" • ")
+                                        append(patientEntity!!.bloodGroup)
+                                    }
+                                    if (isEmpty()) append("ID: ${patientId ?: "OPD-WALKIN"}")
+                                }
+                                Text(metaText, fontSize = 12.sp, color = Slate500, fontWeight = FontWeight.Medium)
+                            }
+                        }
+
+                        val patientAllergies = patientEntity?.allergies ?: ""
+                        val hasPatientAllergies = patientAllergies.isNotBlank() && patientAllergies != "[]"
+                        if (hasPatientAllergies) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Rose50,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Rose500.copy(alpha = 0.35f))
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        "Allergy: $patientAllergies",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Rose500
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // 1. Microphone Voice Capture & Waveform Visualizer
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Slate200),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = if (isRecording) Rose50.copy(alpha = 0.3f) else Color.White),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.2.dp,
+                        if (isRecording) Rose500.copy(alpha = 0.4f) else Slate200
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Big Mic Action Button with Pulsing Wave
+                        // Header Status Strip
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isRecording) Rose500 else Emerald600)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    if (isRecording) "Recording Active..." else "Whisper Offline ASR",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isRecording) Rose500 else Slate700
+                                )
+                            }
+
+                            Surface(shape = RoundedCornerShape(6.dp), color = Slate100) {
+                                Text(
+                                    detectedLanguage,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontSize = 11.sp,
+                                    color = Slate600,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Mic Action Button
                         Box(
                             modifier = Modifier
-                                .size(80.dp)
+                                .size(70.dp)
                                 .clip(CircleShape)
-                                .background(if (isRecording) Rose50 else Sky100)
-                                .border(
-                                    3.dp,
-                                    if (isRecording) Rose500 else Sky500,
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            IconButton(
-                                onClick = {
+                                .background(if (isRecording) Rose500 else Sky600)
+                                .clickable {
                                     if (!isRecording) {
                                         val hasPermission = ContextCompat.checkSelfPermission(
                                             context,
                                             Manifest.permission.RECORD_AUDIO
                                         ) == PackageManager.PERMISSION_GRANTED
-
                                         if (hasPermission) {
                                             whisperEngine.startListening()
                                         } else {
@@ -345,85 +528,76 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                         }
                                     }
                                 },
-                                modifier = Modifier.size(70.dp)
-                            ) {
-                                Icon(
-                                    if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                                    contentDescription = null,
-                                    tint = if (isRecording) Rose500 else Sky600,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                                contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
+                                tint = Color.White,
+                                modifier = Modifier.size(34.dp)
+                            )
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            if (isRecording) "Listening (Whisper STT Active)..." else "Tap Mic to Start Consultation",
+                            if (isRecording) "Listening... Tap to stop & extract" else "Tap Mic to Start Consultation",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
+                            fontSize = 14.sp,
                             color = if (isRecording) Rose500 else Slate800
                         )
 
-                        // Live Waveform Visualizer Bars
+                        // Live Waveform Visualizer
                         if (isRecording) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.height(28.dp)
+                                modifier = Modifier.height(24.dp)
                             ) {
-                                val bars = 9
+                                val bars = 11
                                 for (i in 0 until bars) {
-                                    val heightFactor = ((audioAmplitude * 25) + ((i % 3) * 6) + 4).coerceIn(4f, 26f)
+                                    val heightFactor = ((audioAmplitude * 24) + ((i % 3) * 5) + 4).coerceIn(4f, 24f)
                                     Box(
                                         modifier = Modifier
-                                            .width(4.dp)
+                                            .width(3.5.dp)
                                             .height(heightFactor.dp)
                                             .clip(RoundedCornerShape(2.dp))
-                                            .background(if (isRecording) Rose500 else Sky500)
+                                            .background(Rose500)
                                     )
                                 }
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(shape = RoundedCornerShape(6.dp), color = Slate100) {
-                                Text(
-                                    detectedLanguage,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    fontSize = 11.sp,
-                                    color = Slate600,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Speak in Hindi, English, or Hinglish with patient",
+                                fontSize = 11.sp,
+                                color = Slate400
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Quick Test Action: Load Sample Script
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = {
-                                    whisperEngine.setManualTranscript(sampleScript)
-                                    editableTranscript = sampleScript
-                                    coroutineScope.launch {
-                                        isProcessingExtraction = true
-                                        val json = gemmaEngine.extractMedicalData(sampleScript, assistEnabled)
-                                        extractedJsonStr = json
-                                        extractedData = JSONObject(json)
-                                        isProcessingExtraction = false
-                                    }
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.Science, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Load Clinical Sample Script", fontSize = 12.sp)
-                            }
+                        // Load Clinical Demo Button
+                        OutlinedButton(
+                            onClick = {
+                                whisperEngine.setManualTranscript(sampleScript)
+                                editableTranscript = sampleScript
+                                coroutineScope.launch {
+                                    isProcessingExtraction = true
+                                    val json = gemmaEngine.extractMedicalData(sampleScript, assistEnabled)
+                                    extractedJsonStr = json
+                                    extractedData = JSONObject(json)
+                                    isProcessingExtraction = false
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Slate200),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Science, contentDescription = null, tint = Sky600, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Load Clinical Demo Case", fontSize = 12.sp, color = Slate700, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -437,25 +611,41 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Consultation Transcript", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Slate800)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Surface(shape = RoundedCornerShape(6.dp), color = Emerald50) {
-                                    Text("Whisper Offline", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 11.sp, color = Emerald600, fontWeight = FontWeight.SemiBold)
-                                }
+                                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = Sky600, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    if (showManualInput) "Hide" else "Edit Text",
-                                    fontSize = 12.sp,
-                                    color = Sky600,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.clickable { showManualInput = !showManualInput }
-                                )
+                                Text("Dialogue Transcript", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Slate800)
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (showManualInput) Sky50 else Slate100,
+                                modifier = Modifier.clickable { showManualInput = !showManualInput }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        if (showManualInput) Icons.Default.Check else Icons.Default.Edit,
+                                        contentDescription = null,
+                                        tint = if (showManualInput) Sky600 else Slate600,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        if (showManualInput) "Done" else "Edit Text",
+                                        fontSize = 11.sp,
+                                        color = if (showManualInput) Sky600 else Slate600,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
 
@@ -488,21 +678,29 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                         }
                                     }
                                 },
+                                modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Slate900)
                             ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Extract Notes with Gemma 2B", fontSize = 13.sp)
+                                Text("Extract Notes with Gemma 2B", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
                         } else {
-                            Text(
-                                if (editableTranscript.isNotBlank()) editableTranscript
-                                else "Speech from doctor and patient will appear here in real-time as you speak...",
-                                fontSize = 13.sp,
-                                color = if (editableTranscript.isNotBlank()) Slate700 else Slate400,
-                                lineHeight = 20.sp
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Slate50,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (editableTranscript.isNotBlank()) editableTranscript
+                                    else "Real-time doctor and patient conversation will appear here automatically...",
+                                    fontSize = 12.sp,
+                                    color = if (editableTranscript.isNotBlank()) Slate700 else Slate400,
+                                    lineHeight = 18.sp,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -538,18 +736,24 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
             extractedData?.let { data ->
                 item {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Structured Medical Record", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Slate900)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.MedicalServices, contentDescription = null, tint = Sky600, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Clinical Record (Extracted)", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Slate900)
+                        }
                         Surface(shape = RoundedCornerShape(6.dp), color = Indigo50) {
-                            Text("Gemma 2B Normalized", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 11.sp, color = Indigo600, fontWeight = FontWeight.SemiBold)
+                            Text("Gemma 2B Offline", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 10.sp, color = Indigo600, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
-                // Chief Complaint & Vitals (With Doctor Quick-Edit)
+                // Chief Complaint & Vitals (Responsive Grid & Doctor Quick-Edit)
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -557,28 +761,73 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                         colors = CardDefaults.cardColors(containerColor = Color.White),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Text("Chief Complaint", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400)
-                            Text(data.optString("chiefComplaint", "Medical Consultation"), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            // Chief Complaint Banner
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Sky50,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Sky100),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(Sky100),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.LocalHospital, contentDescription = null, tint = Sky600, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("CHIEF COMPLAINT", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Sky600, letterSpacing = 0.5.sp)
+                                        Text(
+                                            data.optString("chiefComplaint", "Medical Consultation"),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Slate900
+                                        )
+                                    }
+                                }
+                            }
 
                             Spacer(modifier = Modifier.height(14.dp))
 
+                            // Vitals Header
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Recorded Vitals", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate400)
-                                Text(
-                                    "✏️ Edit / Add Vitals",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Sky600,
+                                Text("Recorded Vitals", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Sky50,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Sky100),
                                     modifier = Modifier.clickable { showAddVitalsDialog = true }
-                                )
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = null, tint = Sky600, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            "Record Vitals",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Sky600
+                                        )
+                                    }
+                                }
                             }
 
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
 
                             val vitals = data.optJSONObject("vitals")
                             val temp = vitals?.optString("temperature")?.takeIf { it.isNotBlank() && it != "null" }
@@ -589,15 +838,56 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                             val hasAnyVital = temp != null || bp != null || pulse != null || spo2 != null || weight != null
 
                             if (hasAnyVital) {
+                                // Clean 2-column Grid of Vitals
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    if (temp != null) VitalBadge("Temp", temp)
-                                    if (bp != null) VitalBadge("BP", bp)
-                                    if (pulse != null) VitalBadge("Pulse", pulse)
-                                    if (spo2 != null) VitalBadge("SpO2", spo2)
-                                    if (weight != null) VitalBadge("Weight", weight)
+                                    VitalGridTile(
+                                        label = "Temperature",
+                                        value = temp ?: "--",
+                                        isWarning = temp?.contains("10") == true,
+                                        icon = { Icon(Icons.Default.Thermostat, contentDescription = null, tint = if (temp?.contains("10") == true) Rose500 else Sky600, modifier = Modifier.size(16.dp)) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    VitalGridTile(
+                                        label = "Blood Pressure",
+                                        value = bp ?: "--",
+                                        icon = { Icon(Icons.Default.Speed, contentDescription = null, tint = Sky600, modifier = Modifier.size(16.dp)) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    VitalGridTile(
+                                        label = "Pulse Rate",
+                                        value = pulse ?: "--",
+                                        icon = { Icon(Icons.Default.Favorite, contentDescription = null, tint = Rose500, modifier = Modifier.size(16.dp)) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    VitalGridTile(
+                                        label = "Oxygen (SpO2)",
+                                        value = spo2 ?: "--",
+                                        icon = { Icon(Icons.Default.Air, contentDescription = null, tint = Sky600, modifier = Modifier.size(16.dp)) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                if (weight != null) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(modifier = Modifier.fillMaxWidth()) {
+                                        VitalGridTile(
+                                            label = "Body Weight",
+                                            value = weight,
+                                            icon = { Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = Slate600, modifier = Modifier.size(16.dp)) },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
                             } else {
                                 Surface(
@@ -613,7 +903,7 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                         Icon(Icons.Default.Info, contentDescription = null, tint = Sky600, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            "No vitals in spoken note. Tap 'Edit / Add Vitals' to record physically.",
+                                            "No vitals detected in spoken note. Tap 'Record Vitals' to add physically.",
                                             fontSize = 11.sp,
                                             color = Slate600,
                                             fontWeight = FontWeight.Medium
@@ -622,32 +912,48 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                 }
                             }
 
-                            // Allergies Alert
+                            // Allergies Alert (Clean badge without warning icon)
                             val allergies = data.optJSONArray("allergies")
                             val hasPatientAllergy = patientEntity?.allergies?.isNotBlank() == true && patientEntity?.allergies != "[]"
                             if ((allergies != null && allergies.length() > 0) || hasPatientAllergy) {
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Warning, contentDescription = null, tint = Rose500, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Documented Allergies:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate700)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    if (allergies != null) {
-                                        for (i in 0 until allergies.length()) {
-                                            Surface(shape = RoundedCornerShape(4.dp), color = Rose50, modifier = Modifier.padding(end = 4.dp)) {
-                                                Text(allergies.getString(i), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 11.sp, color = Rose500, fontWeight = FontWeight.Bold)
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Rose50,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Rose500.copy(alpha = 0.3f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text("DOCUMENTED ALLERGIES", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Rose500, letterSpacing = 0.4.sp)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            if (allergies != null && allergies.length() > 0) {
+                                                for (i in 0 until allergies.length()) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = Color.White,
+                                                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Rose500.copy(alpha = 0.25f))
+                                                    ) {
+                                                        Text(allergies.getString(i), modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 11.sp, color = Rose500, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            } else if (hasPatientAllergy) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = Color.White,
+                                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Rose500.copy(alpha = 0.25f))
+                                                ) {
+                                                    Text(patientEntity?.allergies ?: "Penicillin", modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 11.sp, color = Rose500, fontWeight = FontWeight.Bold)
+                                                }
                                             }
-                                        }
-                                    }
-                                    if (hasPatientAllergy && (allergies == null || allergies.length() == 0)) {
-                                        Surface(shape = RoundedCornerShape(4.dp), color = Rose50) {
-                                            Text(patientEntity?.allergies ?: "Penicillin", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 11.sp, color = Rose500, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
                             }
 
-                            // Flagged Issues & Missing Info Alert
+                            // Flagged Issues & Missing Info Alert (Clean presentation without caution/info icons)
                             val flagged = data.optJSONArray("flaggedIssues")
                             val missing = data.optJSONArray("missingInfo")
                             val hasFlagsOrMissing = (flagged != null && flagged.length() > 0) || (missing != null && missing.length() > 0)
@@ -655,12 +961,44 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                 Spacer(modifier = Modifier.height(10.dp))
                                 if (flagged != null && flagged.length() > 0) {
                                     for (i in 0 until flagged.length()) {
-                                        Text("⚠️ ${flagged.getString(i)}", fontSize = 11.sp, color = Amber500, fontWeight = FontWeight.SemiBold)
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Amber50,
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Amber500.copy(alpha = 0.25f)),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("•", fontSize = 14.sp, color = Amber500, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(flagged.getString(i), fontSize = 11.sp, color = Amber500, fontWeight = FontWeight.SemiBold)
+                                            }
+                                        }
                                     }
                                 }
                                 if (missing != null && missing.length() > 0) {
                                     for (i in 0 until missing.length()) {
-                                        Text("ℹ️ ${missing.getString(i)}", fontSize = 11.sp, color = Slate500, fontWeight = FontWeight.Normal)
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Slate50,
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, Slate200),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text("•", fontSize = 14.sp, color = Slate400, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(missing.getString(i), fontSize = 11.sp, color = Slate600, fontWeight = FontWeight.Normal)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -668,9 +1006,10 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                     }
                 }
 
-                // Extracted Symptoms
+                // Extracted Symptoms & Pertinent Negatives Card
                 val symptoms = data.optJSONArray("symptoms")
-                if (symptoms != null && symptoms.length() > 0) {
+                val pertinentNegs = data.optJSONArray("pertinentNegatives")
+                if ((symptoms != null && symptoms.length() > 0) || (pertinentNegs != null && pertinentNegs.length() > 0)) {
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -678,66 +1017,88 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
                         ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
-                                Text("Symptoms & History of Present Illness", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                for (i in 0 until symptoms.length()) {
-                                    val s = symptoms.getJSONObject(i)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                if (symptoms != null && symptoms.length() > 0) {
                                     Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
+                                        modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Column {
-                                            Text(s.optString("name"), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate800)
-                                            val notes = s.optString("notes")
-                                            if (notes.isNotBlank()) {
-                                                Text(notes, fontSize = 11.sp, color = Slate500)
+                                        Text("Symptoms & History (HPI)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+                                        Surface(shape = RoundedCornerShape(6.dp), color = Amber50) {
+                                            Text("${symptoms.length()} Noted", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, color = Amber500, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    for (i in 0 until symptoms.length()) {
+                                        val s = symptoms.getJSONObject(i)
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = Slate50,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 3.dp)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(10.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(s.optString("name"), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate800)
+                                                    val notes = s.optString("notes")
+                                                    if (notes.isNotBlank()) {
+                                                        Text(notes, fontSize = 11.sp, color = Slate500)
+                                                    }
+                                                }
+                                                Surface(shape = RoundedCornerShape(6.dp), color = Amber50) {
+                                                    Text(
+                                                        s.optString("duration", "Recent"),
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                        fontSize = 10.sp,
+                                                        color = Amber500,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
                                             }
                                         }
-                                        Surface(shape = RoundedCornerShape(6.dp), color = Amber50) {
-                                            Text(s.optString("duration", "Recent"), modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 11.sp, color = Amber500, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+
+                                // Pertinent Negatives inside same clinical evaluation card
+                                if (pertinentNegs != null && pertinentNegs.length() > 0) {
+                                    if (symptoms != null && symptoms.length() > 0) {
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        HorizontalDivider(color = Slate100, thickness = 1.dp)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Pertinent Negatives (Ruled Out)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+                                        Surface(shape = RoundedCornerShape(6.dp), color = Emerald50) {
+                                            Text("Excluded", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, color = Emerald600, fontWeight = FontWeight.Bold)
                                         }
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
 
-                // Pertinent Negatives Card (Explicitly Ruled-Out Symptoms)
-                val pertinentNegs = data.optJSONArray("pertinentNegatives")
-                if (pertinentNegs != null && pertinentNegs.length() > 0) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
-                        ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Pertinent Negatives (Ruled Out)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
-                                    Surface(shape = RoundedCornerShape(4.dp), color = Emerald50) {
-                                        Text("Ruled Out", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, color = Emerald600, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                for (i in 0 until pertinentNegs.length()) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(vertical = 3.dp)
-                                    ) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = Emerald600, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(pertinentNegs.getString(i), fontSize = 12.sp, color = Slate700, fontWeight = FontWeight.Medium)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    for (i in 0 until pertinentNegs.length()) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(vertical = 3.dp)
+                                        ) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = Emerald600, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(pertinentNegs.getString(i), fontSize = 12.sp, color = Slate700, fontWeight = FontWeight.Medium)
+                                        }
                                     }
                                 }
                             }
@@ -754,26 +1115,32 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                         colors = CardDefaults.cardColors(containerColor = Color.White),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("Clinical Diagnosis", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        "+ Add Diagnosis",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Sky600,
-                                        modifier = Modifier.clickable { showAddDiagnosisDialog = true }
-                                    )
-                                    if (diagnoses != null && diagnoses.length() > 0) {
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Surface(shape = RoundedCornerShape(6.dp), color = Sky50) {
-                                            Text("Confirmed", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, color = Sky600, fontWeight = FontWeight.Bold)
-                                        }
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Sky50,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Sky100),
+                                    modifier = Modifier.clickable { showAddDiagnosisDialog = true }
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = Sky600, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            "Add Diagnosis",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Sky600
+                                        )
                                     }
                                 }
                             }
@@ -783,18 +1150,22 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                             if (diagnoses != null && diagnoses.length() > 0) {
                                 for (i in 0 until diagnoses.length()) {
                                     val diag = diagnoses.getString(i)
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(vertical = 3.dp)
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Sky50.copy(alpha = 0.5f),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Sky100),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 3.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(6.dp)
-                                                .clip(CircleShape)
-                                                .background(Sky600)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(diag, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                        ) {
+                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Sky600, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(diag, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                                        }
                                     }
                                 }
                             } else {
@@ -810,7 +1181,7 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                     ) {
                                         Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = Slate400, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Diagnosis pending in voice note. Tap '+ Add Diagnosis' if needed.", fontSize = 11.sp, color = Slate500, fontWeight = FontWeight.Medium)
+                                        Text("No diagnosis stated in voice note. Tap '+ Add Diagnosis' if needed.", fontSize = 11.sp, color = Slate500, fontWeight = FontWeight.Medium)
                                     }
                                 }
                             }
@@ -829,23 +1200,54 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                         colors = CardDefaults.cardColors(containerColor = Color.White),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
                     ) {
-                        Column(modifier = Modifier.padding(18.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            // Prescription Header
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Prescription (Generic Normalized)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
-                                Text(
-                                    "+ Add Medicine",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Sky600,
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Medication, contentDescription = null, tint = Sky600, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Prescription (Rx)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+                                    if (meds != null && meds.length() > 0) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(shape = RoundedCornerShape(6.dp), color = Sky50) {
+                                            Text(
+                                                "${meds.length()} Item${if (meds.length() > 1) "s" else ""}",
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                fontSize = 10.sp,
+                                                color = Sky600,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Sky50,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Sky100),
                                     modifier = Modifier.clickable { showAddMedicineDialog = true }
-                                )
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, tint = Sky600, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            "Add Medicine",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Sky600
+                                        )
+                                    }
+                                }
                             }
 
-                            // Offline Safety Alert Banner if allergy conflict exists
+                            // Allergy Conflict Alert Banner (Clean banner without warning icon)
                             if (allergyConflict != null) {
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Surface(
@@ -854,16 +1256,19 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                     border = androidx.compose.foundation.BorderStroke(1.dp, Rose500.copy(alpha = 0.4f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Warning, contentDescription = null, tint = Rose500, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                         Text(
-                                            "CRITICAL CONTRAINDICATION: ${allergyConflict.second} conflicts with documented ${allergyConflict.first} allergy!",
-                                            fontSize = 11.sp,
+                                            "CONTRAINDICATION DETECTED",
+                                            fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
+                                            color = Rose500,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            "${allergyConflict.second} conflicts with documented ${allergyConflict.first} allergy!",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = Rose500,
                                             lineHeight = 15.sp
                                         )
@@ -879,51 +1284,175 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                     val drugName = m.optString("name")
                                     val isContraindicated = allergyConflict != null && drugName.equals(allergyConflict.second, ignoreCase = true)
 
-                                    Column(
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isContraindicated) Rose50.copy(alpha = 0.5f) else Slate50,
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isContraindicated) Rose500.copy(alpha = 0.4f) else Slate200
+                                        ),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 6.dp)
+                                            .padding(vertical = 4.dp)
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text("${i + 1}. $drugName ${m.optString("dosage")}", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (isContraindicated) Rose500 else Slate900)
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            // Top Row: Rx Badge, Drug Name, Dosage & Delete Action
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(5.dp),
+                                                        color = if (isContraindicated) Rose500.copy(alpha = 0.15f) else Sky100
+                                                    ) {
+                                                        Text(
+                                                            "Rx ${i + 1}",
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isContraindicated) Rose500 else Sky600,
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        drugName,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 13.sp,
+                                                        color = if (isContraindicated) Rose500 else Slate900
+                                                    )
+                                                    val dosage = m.optString("dosage")
+                                                    if (dosage.isNotBlank() && dosage != "null") {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Surface(
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            color = if (isContraindicated) Rose50 else Sky100
+                                                        ) {
+                                                            Text(
+                                                                dosage,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = if (isContraindicated) Rose500 else Sky600,
+                                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                                IconButton(
+                                                    onClick = {
+                                                        val updatedArray = JSONArray()
+                                                        for (j in 0 until meds.length()) {
+                                                            if (j != i) updatedArray.put(meds.getJSONObject(j))
+                                                        }
+                                                        data.put("medications", updatedArray)
+                                                        extractedData = JSONObject(data.toString())
+                                                        extractedJsonStr = data.toString(2)
+                                                    },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.DeleteOutline,
+                                                        contentDescription = "Remove drug",
+                                                        tint = Slate400,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            // Middle Row: Frequency & Duration Tags
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = Sky50,
+                                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Sky100)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Schedule, contentDescription = null, tint = Sky600, modifier = Modifier.size(11.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            m.optString("frequency", "As directed"),
+                                                            fontSize = 10.sp,
+                                                            color = Sky600,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
+                                                    }
+                                                }
+
+                                                val dur = m.optString("duration")
+                                                if (dur.isNotBlank() && dur != "null") {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = Slate100,
+                                                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Slate200)
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                                        ) {
+                                                            Icon(Icons.Default.DateRange, contentDescription = null, tint = Slate600, modifier = Modifier.size(11.dp))
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                            Text(
+                                                                dur,
+                                                                fontSize = 10.sp,
+                                                                color = Slate700,
+                                                                fontWeight = FontWeight.Medium
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
                                                 if (isContraindicated) {
-                                                    Spacer(modifier = Modifier.width(6.dp))
-                                                    Surface(shape = RoundedCornerShape(4.dp), color = Rose50) {
-                                                        Text("Allergy Risk", color = Rose500, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = Rose50,
+                                                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Rose500.copy(alpha = 0.3f))
+                                                    ) {
+                                                        Text(
+                                                            "Allergy Risk",
+                                                            color = Rose500,
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                                        )
                                                     }
                                                 }
                                             }
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(m.optString("frequency"), fontSize = 12.sp, color = Sky600, fontWeight = FontWeight.SemiBold)
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Icon(
-                                                    Icons.Default.DeleteOutline,
-                                                    contentDescription = "Remove drug",
-                                                    tint = Slate400,
-                                                    modifier = Modifier
-                                                        .size(16.dp)
-                                                        .clickable {
-                                                            // Remove item from medications array
-                                                            val updatedArray = JSONArray()
-                                                            for (j in 0 until meds.length()) {
-                                                                if (j != i) updatedArray.put(meds.getJSONObject(j))
-                                                            }
-                                                            data.put("medications", updatedArray)
-                                                            extractedData = JSONObject(data.toString())
-                                                            extractedJsonStr = data.toString(2)
-                                                        }
-                                                )
+
+                                            // Instructions / Special Advice Row
+                                            val instr = m.optString("instructions")
+                                            if (instr.isNotBlank() && instr != "null") {
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = Color.White,
+                                                    border = androidx.compose.foundation.BorderStroke(0.6.dp, Slate200),
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(Icons.Default.Description, contentDescription = null, tint = Slate400, modifier = Modifier.size(12.dp))
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(instr, fontSize = 11.sp, color = Slate600)
+                                                    }
+                                                }
                                             }
                                         }
-                                        Text("${m.optString("duration")} • ${m.optString("instructions")}", fontSize = 11.sp, color = Slate500)
-                                    }
-                                    if (i < meds.length() - 1) {
-                                        HorizontalDivider(color = Slate100, thickness = 1.dp)
                                     }
                                 }
                             } else {
@@ -947,7 +1476,7 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                     }
                 }
 
-                // Follow-Up & Care Advice
+                // Follow-Up & Care Advice (Modern clean Material icons)
                 val followUp = data.optString("followUp")
                 val additionalNotes = data.optString("additionalNotes")
                 if (followUp.isNotBlank() || additionalNotes.isNotBlank()) {
@@ -958,20 +1487,73 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
                         ) {
-                            Column(modifier = Modifier.padding(18.dp)) {
-                                Text("Follow-up & Patient Care Instructions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AssignmentTurnedIn, contentDescription = null, tint = Emerald600, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Follow-up & Care Instructions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate800)
+                                }
+
                                 if (followUp.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        Text("Follow-up: ", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate600)
-                                        Text(followUp, fontSize = 12.sp, color = Slate800)
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Sky50.copy(alpha = 0.5f),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Sky100),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Sky100,
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Default.Event, contentDescription = null, tint = Sky600, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text("FOLLOW-UP SCHEDULE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Sky600, letterSpacing = 0.4.sp)
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(followUp, fontSize = 12.sp, color = Slate900, fontWeight = FontWeight.Medium)
+                                            }
+                                        }
                                     }
                                 }
+
                                 if (additionalNotes.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(verticalAlignment = Alignment.Top) {
-                                        Text("Care Advice: ", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate600)
-                                        Text(additionalNotes, fontSize = 12.sp, color = Slate800)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Emerald50.copy(alpha = 0.5f),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Emerald600.copy(alpha = 0.2f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Emerald50,
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, Emerald600.copy(alpha = 0.3f)),
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Default.HealthAndSafety, contentDescription = null, tint = Emerald600, modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text("PATIENT ADVICE & DIET", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Emerald600, letterSpacing = 0.4.sp)
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(additionalNotes, fontSize = 12.sp, color = Slate800, lineHeight = 17.sp)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1117,7 +1699,7 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                             for (i in 0 until warnings.length()) {
                                                 Row(verticalAlignment = Alignment.Top) {
-                                                    Text("⚠️", fontSize = 12.sp)
+                                                    Text("•", fontSize = 14.sp, color = Rose500, fontWeight = FontWeight.Bold)
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     Text(
                                                         warnings.getString(i),
@@ -1192,38 +1774,6 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                         }
                     }
                 }
-
-                // Save to Offline Room DB & Trigger Background Sync
-                item {
-                    Button(
-                        onClick = {
-                            val conflict = findDrugAllergyConflict()
-                            if (conflict != null && !allergyOverrideConfirmed) {
-                                conflictingAllergyName = conflict.first
-                                conflictingDrugName = conflict.second
-                                showAllergyConfirmDialog = true
-                            } else {
-                                saveConsultationToLocalDb()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(54.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
-                        enabled = !isSaving
-                    ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Saving to Offline Queue...", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        } else {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Save & Add to Offline Sync Queue", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        }
-                    }
-                }
             }
         }
     }
@@ -1278,6 +1828,7 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
         var bpInput by remember { mutableStateOf(vitalsObj.optString("bp", "")) }
         var pulseInput by remember { mutableStateOf(vitalsObj.optString("pulse", "")) }
         var spo2Input by remember { mutableStateOf(vitalsObj.optString("spo2", "")) }
+        var weightInput by remember { mutableStateOf(vitalsObj.optString("weight", "")) }
 
         AlertDialog(
             onDismissRequest = { showAddVitalsDialog = false },
@@ -1317,6 +1868,14 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                         colors = cleanTextFieldColors(),
                         singleLine = true
                     )
+                    OutlinedTextField(
+                        value = weightInput,
+                        onValueChange = { weightInput = it },
+                        label = { Text("Weight (e.g. 68 kg)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = cleanTextFieldColors(),
+                        singleLine = true
+                    )
                 }
             },
             confirmButton = {
@@ -1328,6 +1887,7 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                             if (bpInput.isNotBlank()) put("bp", if (!bpInput.contains("mmHg", ignoreCase = true)) "${bpInput.trim()} mmHg" else bpInput.trim())
                             if (pulseInput.isNotBlank()) put("pulse", if (!pulseInput.contains("bpm", ignoreCase = true)) "${pulseInput.trim()} bpm" else pulseInput.trim())
                             if (spo2Input.isNotBlank()) put("spo2", if (!spo2Input.contains("%")) "${spo2Input.trim()}%" else spo2Input.trim())
+                            if (weightInput.isNotBlank()) put("weight", if (!weightInput.contains("kg", ignoreCase = true)) "${weightInput.trim()} kg" else weightInput.trim())
                         }
                         currentData.put("vitals", updatedVitals)
                         extractedData = JSONObject(currentData.toString())
@@ -1542,6 +2102,51 @@ Doctor: CBC aur Dengue NS1 test karwao. 3 din mein bukhar nahi utra toh wapas aa
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun VitalGridTile(
+    label: String,
+    value: String,
+    icon: @Composable () -> Unit,
+    isWarning: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (isWarning) Amber50.copy(alpha = 0.7f) else Slate50,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isWarning) Amber500.copy(alpha = 0.5f) else Slate200
+        ),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    label.uppercase(),
+                    fontSize = 10.sp,
+                    color = if (isWarning) Amber500 else Slate400,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.4.sp
+                )
+                icon()
+            }
+            Text(
+                value,
+                fontSize = 14.sp,
+                color = if (isWarning) Slate900 else Slate800,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
