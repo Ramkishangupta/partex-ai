@@ -77,7 +77,10 @@ fun DashboardScreen(
     }
 
     val statsAllergiesCount = remember(myPatients) {
-        myPatients.count { it.allergies.isNotBlank() }
+        myPatients.count {
+            val clean = it.allergies.trim()
+            clean.isNotBlank() && clean != "[]" && !clean.equals("none", ignoreCase = true) && !clean.equals("null", ignoreCase = true)
+        }
     }
 
     val maleCount = remember(myPatients) { myPatients.count { it.gender.equals("male", ignoreCase = true) } }
@@ -244,7 +247,7 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     StatCard(title = "Patients", value = "${patients.size}", icon = Icons.Default.People, modifier = Modifier.weight(1f))
-                    StatCard(title = "Allergies", value = "$statsAllergiesCount", icon = Icons.Default.Warning, modifier = Modifier.weight(1f))
+                    StatCard(title = "Allergies", value = "$statsAllergiesCount", icon = Icons.Default.Shield, modifier = Modifier.weight(1f))
                     StatCard(title = "M / F", value = "$maleCount / $femaleCount", icon = Icons.Default.Wc, modifier = Modifier.weight(1f))
                 }
             }
@@ -579,19 +582,39 @@ private fun WebStylePatientCard(
                 }
             }
 
-            if (patient.allergies.isNotBlank()) {
+            val cleanAllergies = remember(patient.allergies) {
+                val raw = patient.allergies.trim()
+                if (raw.isBlank() || raw == "[]" || raw.equals("none", ignoreCase = true) || raw.equals("null", ignoreCase = true)) {
+                    ""
+                } else {
+                    raw.removePrefix("[").removeSuffix("]").replace("\"", "").trim()
+                }
+            }
+
+            if (cleanAllergies.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Rose50
                 ) {
-                    Text(
-                        "⚠️ Allergies: ${patient.allergies}",
+                    Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontSize = 12.sp,
-                        color = Rose500,
-                        fontWeight = FontWeight.Medium
-                    )
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Shield,
+                            contentDescription = null,
+                            tint = Rose500,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            "Allergies: $cleanAllergies",
+                            fontSize = 12.sp,
+                            color = Rose500,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 

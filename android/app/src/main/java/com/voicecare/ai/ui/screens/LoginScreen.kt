@@ -15,11 +15,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,9 +52,6 @@ fun LoginScreen(
     var isBusy by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Server Configuration state for network flexibility
-    var showServerConfig by remember { mutableStateOf(false) }
-    var serverUrl by remember { mutableStateOf(NetworkClient.baseUrl) }
 
     Box(
         modifier = Modifier
@@ -141,65 +136,10 @@ fun LoginScreen(
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Doctor Sign In", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
-                            Text("Authorized medical personnel only", fontSize = 12.sp, color = Slate500)
-                        }
-
-                        IconButton(onClick = { showServerConfig = !showServerConfig }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Server Settings",
-                                tint = if (showServerConfig) Sky600 else Slate400,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                    Column {
+                        Text("Doctor Sign In", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                        Text("Authorized medical personnel only", fontSize = 12.sp, color = Slate500)
                     }
-
-                    // Collapsible Server URL config
-                    AnimatedVisibility(visible = showServerConfig) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Slate50)
-                                .border(1.dp, Slate200, RoundedCornerShape(14.dp))
-                                .padding(12.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Wifi, contentDescription = null, tint = Sky600, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Backend Server URL", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate700)
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = serverUrl,
-                                onValueChange = {
-                                    serverUrl = it
-                                    NetworkClient.baseUrl = it
-                                },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = cleanTextFieldColors(),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Emulator: http://10.0.2.2:5000/ • Physical Device: http://<YOUR_PC_IP>:5000/",
-                                fontSize = 10.sp,
-                                color = Slate400
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Notice Badge explaining the verification logic
                     Surface(
