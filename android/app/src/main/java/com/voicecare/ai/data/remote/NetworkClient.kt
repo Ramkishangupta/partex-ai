@@ -42,7 +42,11 @@ object NetworkClient {
     private fun getRetrofit(): Retrofit {
         return retrofit ?: synchronized(this) {
             val loggingInterceptor = HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = if (com.voicecare.ai.BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.BODY
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
             }
 
             val authInterceptor = Interceptor { chain ->
