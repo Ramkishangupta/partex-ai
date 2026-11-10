@@ -117,7 +117,7 @@ fun PatientHistoryScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    "ID: $patientId" + if (!patient?.phone.isNullOrBlank()) " • 📞 ${patient?.phone}" else "",
+                                    "ID: $patientId" + if (!patient?.phone.isNullOrBlank()) " • Tel: ${patient?.phone}" else "",
                                     fontSize = 12.sp,
                                     color = Slate500
                                 )

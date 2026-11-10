@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -17,9 +19,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -38,6 +44,7 @@ fun LoginScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -45,22 +52,45 @@ fun LoginScreen(
     var isBusy by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
+    val handleLogin = {
+        if (email.isBlank() || password.isBlank()) {
+            errorMessage = "Please enter both your doctor email and password."
+        } else {
+            isBusy = true
+            errorMessage = ""
+            coroutineScope.launch {
+                val result = repository.loginDoctor(email.trim(), password)
+                isBusy = false
+                result.fold(
+                    onSuccess = { doctorEntity ->
+                        onLoginSuccess(doctorEntity)
+                    },
+                    onFailure = { ex ->
+                        errorMessage = ex.message ?: "Login failed. Please check credentials or network connection."
+                    }
+                )
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Slate50)
+            .statusBarsPadding()
+            .navigationBarsPadding()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Clean Centered Logo
+            // Direct Clean Logo without outer white box
             Image(
                 painter = painterResource(id = R.drawable.ic_voicecare_logo),
                 contentDescription = "VoiceCare AI",
@@ -72,7 +102,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                "VoiceCare AI",
+                text = "VoiceCare AI",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Slate900
@@ -81,7 +111,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                "Clinical OPD Console",
+                text = "Clinical OPD Console",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = Slate500
@@ -99,14 +129,14 @@ fun LoginScreen(
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
                     Text(
-                        "Doctor Sign In",
+                        text = "Doctor Sign In",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Slate900
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        "Enter your credentials to continue",
+                        text = "Enter your credentials to continue",
                         fontSize = 12.sp,
                         color = Slate500
                     )
@@ -123,10 +153,22 @@ fun LoginScreen(
                             errorMessage = ""
                         },
                         leadingIcon = {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = Slate400, modifier = Modifier.size(18.dp))
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = null,
+                                tint = Slate400,
+                                modifier = Modifier.size(18.dp)
+                            )
                         },
                         placeholder = { Text("e.g. doctor@hospital.org", color = Slate400, fontSize = 14.sp) },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Next
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = cleanTextFieldColors(),
@@ -145,11 +187,26 @@ fun LoginScreen(
                             errorMessage = ""
                         },
                         leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null, tint = Slate400, modifier = Modifier.size(18.dp))
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = Slate400,
+                                modifier = Modifier.size(18.dp)
+                            )
                         },
                         placeholder = { Text("Enter your password", color = Slate400, fontSize = 14.sp) },
                         singleLine = true,
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                focusManager.clearFocus()
+                                handleLogin()
+                            }
+                        ),
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
@@ -175,7 +232,7 @@ fun LoginScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, Rose500.copy(alpha = 0.3f))
                         ) {
                             Text(
-                                errorMessage,
+                                text = errorMessage,
                                 modifier = Modifier.padding(12.dp),
                                 fontSize = 12.sp,
                                 color = Rose500,
@@ -189,26 +246,8 @@ fun LoginScreen(
                     // Submit Action Button
                     Button(
                         onClick = {
-                            if (email.isBlank() || password.isBlank()) {
-                                errorMessage = "Please enter both your doctor email and password."
-                                return@Button
-                            }
-
-                            isBusy = true
-                            errorMessage = ""
-
-                            coroutineScope.launch {
-                                val result = repository.loginDoctor(email, password)
-                                isBusy = false
-                                result.fold(
-                                    onSuccess = { doctorEntity ->
-                                        onLoginSuccess(doctorEntity)
-                                    },
-                                    onFailure = { ex ->
-                                        errorMessage = ex.message ?: "Login failed. Please check credentials or network connection."
-                                    }
-                                )
-                            }
+                            focusManager.clearFocus()
+                            handleLogin()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -232,7 +271,11 @@ fun LoginScreen(
                             ) {
                                 Text("Sign In to Clinic", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
                     }

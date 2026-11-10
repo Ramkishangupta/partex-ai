@@ -104,6 +104,15 @@ fun ConsultationScreen(
         }
     }
 
+    // Clean up microphone & ASR engine when leaving consultation screen
+    DisposableEffect(Unit) {
+        onDispose {
+            if (whisperEngine.isRecording.value) {
+                whisperEngine.stopListening()
+            }
+        }
+    }
+
     // Offline Drug-Allergy Safety Conflict Detector
     fun findDrugAllergyConflict(): Pair<String, String>? {
         val meds = extractedData?.optJSONArray("medications") ?: return null
